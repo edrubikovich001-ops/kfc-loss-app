@@ -578,9 +578,20 @@ async function loadReportsFromServer() {
   }
 
   // ✅ Excel через сервер. Работает на iPhone/Telegram WebView.
-  function exportExcelServer() {
-    window.location.href = `${API}/export.xlsx`;
+  function exportExcel() {
+  const tg = window.Telegram?.WebApp;
+  const url = `${window.location.origin}/api/export.xlsx`;
+
+  // В Telegram iOS лучше открывать ссылку через tg.openLink
+  if (tg && typeof tg.openLink === "function") {
+    tg.openLink(url);
+    return;
   }
+
+  // обычный браузер
+  window.location.href = url;
+}
+
 
   async function saveReport() {
   const val = parseInt(document.getElementById('sum-input').value) || 0;
