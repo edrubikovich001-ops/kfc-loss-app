@@ -576,52 +576,54 @@ async function loadReportsFromServer() {
   }
 
   async function saveReport() {
-    const val = parseInt(document.getElementById('sum-input').value) || 0;
-    if (val <= 0) { alert("Укажи сумму больше нуля."); return; }
+  const val = parseInt(document.getElementById('sum-input').value) || 0;
+  if (val <= 0) return;
 
-    state.amount = val;
+  state.amount = val;
 
-    // Пересчитать ts.
-    state.start.ts = new Date(state.start.year, state.start.month, state.start.day, state.start.hour, state.start.min).getTime();
-    state.end.ts = new Date(state.end.year, state.end.month, state.end.day, state.end.hour, state.end.min).getTime();
+  const startStr = `${state.start.day}.${state.start.month+1}.${state.start.year} ${String(state.start.hour).padStart(2,'0')}:${String(state.start.min).padStart(2,'0')}`;
+  const endStr   = `${state.end.day}.${state.end.month+1}.${state.end.year} ${String(state.end.hour).padStart(2,'0')}:${String(state.end.min).padStart(2,'0')}`;
 
-    const payload = {
-      manager: state.manager,
-      restaurant: state.restaurant,
-      reason: state.reason,
-      amount: state.amount,
-      start: formatRu(state.start),
-      end: formatRu(state.end),
-      comment: state.comment || "-"
-    };
+  const payload = {
+    manager: state.manager,
+    restaurant: state.restaurant,
+    reason: state.reason,
+    amount: state.amount,
+    start: startStr,
+    end: endStr,
+    comment: state.comment || '-'
+  };
 
-    try {
-      if (state.editId) {
-        await apiJson(`${API}/reports/${state.editId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await apiJson(`${API}/reports`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }
+  try {
+    const isEdit = !!state.editId;
 
-      // После изменения всегда подтягиваем с сервера, чтобы ПК/телефон синхронизировались.
-      await loadReportsFromServer();
+    const resp = await fetch(isEdit ? `/api/reports/${state.editId}` : "/api/reports", {
+      method: isEdit ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-      if (state.draftId) db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
-
-      state.view='main'; historyStack=['main']; state.editId = null; render();
-      if (tg) tg.showPopup({ title: "Готово.", message: "Отчёт сохранён.", buttons: [{ type: "ok" }] });
-    } catch (e) {
-      alert(`Ошибка: ${e?.message || 'unknown'}`);
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) {
+      alert(`Ошибка сохранения: ${data.error || resp.status}`);
+      return;
     }
+
+    // обновляем список с сервера (самый надёжный способ)
+    await loadReportsFromServer();
+
+    // черновик удалить локально, если был
+    if (state.draftId) {
+      db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
+      saveDraftsToLS();
+    }
+
+    state.view='main'; historyStack=['main']; render();
+  } catch (e) {
+    alert(`Ошибка: ${e?.message || 'unknown'}`);
   }
+}
+
 
   function editReport(id) {
     const r = db.reports.find(x => x.id === id);
