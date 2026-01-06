@@ -1,7 +1,147 @@
 <!doctype html>
 <html lang="ru">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KFC Loss</title></head>
-<body style="font-family: Arial; padding:16px;">
-  <h2>KFC Loss — OK</h2>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>KFC Loss Control</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-black text-white">
+  <div class="max-w-[430px] mx-auto min-h-screen px-5 py-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-xl font-black uppercase tracking-tight">KFC</h1>
+        <p class="text-[10px] text-[#E4002B] font-bold tracking-[0.25em] uppercase">Loss Control</p>
+      </div>
+      <span id="tg-badge" class="text-[10px] px-2 py-1 rounded bg-white/10 text-gray-300">WEB</span>
+    </div>
+
+    <div class="space-y-3">
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Менеджер.</span>
+        <input id="manager" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="Например: Артём." />
+      </label>
+
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Ресторан.</span>
+        <input id="restaurant" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="Например: 12714 — KFC Essentai Mall." />
+      </label>
+
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Причина.</span>
+        <select id="reason" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none">
+          <option>Внешние факторы</option>
+          <option>Отсутствие продукта</option>
+          <option>Персонал</option>
+          <option>Внутренние факторы</option>
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Сумма потерь, ₸.</span>
+        <input id="amount" type="number" inputmode="numeric" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none text-[#E4002B] font-black text-xl" placeholder="0" />
+      </label>
+
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Период (текстом).</span>
+        <input id="period" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="01.01.2026 10:00 — 01.01.2026 11:00." />
+      </label>
+
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Детали.</span>
+        <textarea id="comment" rows="4" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="Коротко опиши ситуацию."></textarea>
+      </label>
+    </div>
+
+    <div class="mt-5">
+      <button id="sendBtn" class="w-full bg-[#E4002B] py-4 rounded-2xl font-black text-lg active:scale-[0.98] transition">
+        Отправить.
+      </button>
+
+      <div id="status" class="mt-3 text-[12px] text-gray-400"></div>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      document.getElementById("tg-badge").textContent = "TELEGRAM";
+    }
+
+    function nowStr() {
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      return `${dd}.${mm}.${yy} ${hh}:${mi}`;
+    }
+
+    const statusEl = document.getElementById("status");
+    const btn = document.getElementById("sendBtn");
+
+    btn.addEventListener("click", async () => {
+      statusEl.textContent = "";
+      btn.disabled = true;
+      btn.textContent = "Отправляю.";
+
+      try {
+        const manager = document.getElementById("manager").value.trim();
+        const restaurant = document.getElementById("restaurant").value.trim();
+        const reason = document.getElementById("reason").value.trim();
+        const amount = Number(document.getElementById("amount").value);
+        const period = document.getElementById("period").value.trim();
+        const comment = document.getElementById("comment").value.trim();
+
+        if (!manager || !restaurant || !reason) {
+          statusEl.textContent = "Заполни менеджера, ресторан и причину.";
+          return;
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+          statusEl.textContent = "Укажи сумму больше нуля.";
+          return;
+        }
+
+        const start = period ? period.split("—")[0]?.trim() : nowStr();
+        const end = period ? period.split("—")[1]?.trim() : nowStr();
+
+        const payload = {
+          manager,
+          restaurant,
+          reason,
+          amount,
+          start: start || nowStr(),
+          end: end || nowStr(),
+          comment: comment || "-"
+        };
+
+        const resp = await fetch("/api/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          statusEl.textContent = `Ошибка отправки: ${data.error || resp.status}`;
+          return;
+        }
+
+        statusEl.textContent = "Готово. Сообщение отправлено в Telegram.";
+        if (tg) tg.showPopup({ title: "Готово.", message: "Отчёт отправлен в Telegram.", buttons: [{ type: "ok" }] });
+      } catch (e) {
+        statusEl.textContent = `Ошибка: ${e?.message || "unknown"}`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Отправить.";
+      }
+    });
+  </script>
 </body>
 </html>
