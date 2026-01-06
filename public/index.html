@@ -464,39 +464,62 @@
       render();
     }
 
-    function exportExcel(){
-      const reps = filterAnalytics(db.reports);
-      if(!reps.length) return;
+    ffunction exportExcel() {
+  const reps = filterAnalytics(db.reports);
+  if (!reps.length) {
+    alert("Нет данных для выгрузки.");
+    return;
+  }
 
-      const data = reps.map(r => {
-        const startD = new Date(r.start.year,r.start.month,r.start.day,r.start.hour,r.start.min);
-        const endD = new Date(r.end.year,r.end.month,r.end.day,r.end.hour,r.end.min);
-        const diffHours = ((endD-startD)/(1000*60*60)).toFixed(2);
-        return {
-          'ТУ': r.manager,
-          'Ресторан': r.restaurant,
-          'Причина': r.reason,
-          'Комментарий': r.comment || '-',
-          'Начало': `${r.start.day}.${r.start.month+1}.${r.start.year} ${r.start.hour}:${r.start.min.toString().padStart(2,'0')}`,
-          'Конец': `${r.end.day}.${r.end.month+1}.${r.end.year} ${r.end.hour}:${r.end.min.toString().padStart(2,'0')}`,
-          'Длительность (ч)': parseFloat(diffHours),
-          'Сумма потерь': r.amount
-        };
-      });
+  const data = reps.map(r => {
+    const startD = new Date(r.start.year, r.start.month, r.start.day, r.start.hour, r.start.min);
+    const endD = new Date(r.end.year, r.end.month, r.end.day, r.end.hour, r.end.min);
+    const diffHours = ((endD - startD) / (1000 * 60 * 60)).toFixed(2);
 
-      const ws = XLSX.utils.json_to_sheet(data);
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      for(let R=range.s.r+1; R<=range.e.r; ++R){
-        const cellAddress = XLSX.utils.encode_cell({c:7, r:R});
-        if(!ws[cellAddress]) continue;
-        ws[cellAddress].t='n';
-        ws[cellAddress].z='#,##0 "₸"';
-      }
+    return {
+      'ТУ': r.manager,
+      'Ресторан': r.restaurant,
+      'Причина': r.reason,
+      'Комментарий': r.comment || '-',
+      'Начало': `${r.start.day}.${r.start.month+1}.${r.start.year} ${String(r.start.hour).padStart(2,'0')}:${String(r.start.min).padStart(2,'0')}`,
+      'Конец': `${r.end.day}.${r.end.month+1}.${r.end.year} ${String(r.end.hour).padStart(2,'0')}:${String(r.end.min).padStart(2,'0')}`,
+      'Длительность (ч)': Number(diffHours),
+      'Сумма потерь': Number(r.amount)
+    };
+  });
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Потери");
-      XLSX.writeFile(wb, `KFC_Loss_Report_${new Date().toLocaleDateString()}.xlsx`);
-    }
+  const ws = XLSX.utils.json_to_sheet(data);
+
+  // Формат валюты для колонки "Сумма потерь" (последняя колонка = индекс 7)
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+    const cellAddress = XLSX.utils.encode_cell({ c: 7, r: R });
+    if (!ws[cellAddress]) continue;
+    ws[cellAddress].t = 'n';
+    ws[cellAddress].z = '#,##0 "₸"';
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Потери");
+
+  // ✅ Telegram/мобильные браузеры: через Blob
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([wbout], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+
+  const fileName = `KFC_Loss_Report_${new Date().toISOString().slice(0,10)}.xlsx`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
     // ✅ ВАЖНО: отправка через backend (/api/send), а не напрямую по токену.
     async function saveReport(){
