@@ -290,13 +290,25 @@
           if(inp){ inp.focus(); scaleSumInput(inp); }
         }, 100);
       }
-
       else if (state.view === 'analytics_period') {
-        title.innerText = "Аналитика";
-        [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}].forEach(opt => {
-          container.innerHTML += `<button onclick="${opt.id==='custom'?'navigate(\\'analytics_custom\\')':'state.filter=\\''+opt.id+'\\';navigate(\\'analytics_view\\')'}" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${opt.n}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
-        });
-      }
+  title.innerText = "Аналитика";
+
+  [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}]
+    .forEach(opt => {
+
+      const handler = (opt.id === 'custom')
+        ? "navigate('analytics_custom')"
+        : `state.filter='${opt.id}';navigate('analytics_view')`;
+
+      container.innerHTML += `
+        <button onclick="${handler}"
+          class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
+          <span>${opt.n}</span>
+          <i data-lucide="chevron-right" class="opacity-30"></i>
+        </button>
+      `;
+    });
+}
 
       else if (state.view === 'analytics_custom') {
         title.innerText = "Период";
