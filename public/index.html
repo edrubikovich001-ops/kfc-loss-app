@@ -1,147 +1,620 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>KFC Loss Control</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>KFC Loss Control - Pro</title>
+
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+
+    :root { --ios-blue:#0A84FF; --kfc-red:#E4002B; --item-height:52px; }
+
+    body{
+      font-family:'Inter',-apple-system,sans-serif;
+      background-color:#000;
+      color:#fff;
+      margin:0;
+      overflow:hidden;
+      -webkit-tap-highlight-color:transparent;
+      user-select:none;
+    }
+    .ios-card{ background:#1C1C1E; border-radius:16px; border:1px solid rgba(255,255,255,0.08); }
+
+    .wheel-box{ display:flex; align-items:center; background:#2C2C2E; border-radius:12px; height:var(--item-height); padding:0 10px; border:1px solid rgba(255,255,255,0.1); }
+    .wheel{ height:var(--item-height); overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; width:44px; text-align:center; }
+    .wheel::-webkit-scrollbar{ display:none; }
+    .wheel-item{ height:var(--item-height); display:flex; align-items:center; justify-content:center; scroll-snap-align:center; font-size:22px; font-weight:600; color:#444; transition:all .2s; }
+    .wheel-item.active{ color:var(--ios-blue); font-weight:800; transform:scale(1.1); }
+
+    .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+    .day-btn{ aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; border-radius:12px; cursor:pointer; color:#ccc; }
+    .day-btn.selected{ background:var(--ios-blue)!important; color:#fff!important; font-weight:700; }
+    .day-btn.range{ background:rgba(10,132,255,0.2); color:#fff; }
+
+    .ios-select{ background:#2C2C2E; color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:14px; font-weight:600; }
+
+    .tab-btn{ flex:1; padding:12px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#666; border-bottom:2px solid transparent; transition:all .3s; }
+    .tab-btn.active{ color:#fff; border-bottom-color:var(--kfc-red); }
+
+    .progress-bar{ height:4px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden; margin-top:8px; }
+    .progress-fill{ height:100%; background:var(--kfc-red); border-radius:2px; }
+
+    #sum-input{ background:transparent; color:var(--kfc-red); font-weight:900; text-align:center; border:none; outline:none; width:100%; }
+
+    .draft-badge{ background:#E4002B; color:#fff; padding:2px 6px; border-radius:4px; font-size:8px; font-weight:900; text-transform:uppercase; }
+    main::-webkit-scrollbar{ display:none; }
+  </style>
 </head>
 
-<body class="bg-black text-white">
-  <div class="max-w-[430px] mx-auto min-h-screen px-5 py-6">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-xl font-black uppercase tracking-tight">KFC</h1>
-        <p class="text-[10px] text-[#E4002B] font-bold tracking-[0.25em] uppercase">Loss Control</p>
+<body>
+  <div class="max-w-[430px] mx-auto h-screen flex flex-col bg-black relative overflow-hidden">
+    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/80 backdrop-blur-md z-50">
+      <div class="flex items-center gap-4">
+        <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5">
+          <i data-lucide="chevron-left" class="text-blue-500"></i>
+        </button>
+        <div class="flex flex-col">
+          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter text-white">KFC</h1>
+          <p class="text-[9px] text-[#E4002B] font-bold tracking-[0.2em] uppercase">Loss Control</p>
+        </div>
       </div>
-      <span id="tg-badge" class="text-[10px] px-2 py-1 rounded bg-white/10 text-gray-300">WEB</span>
-    </div>
-
-    <div class="space-y-3">
-      <label class="block">
-        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Менеджер.</span>
-        <input id="manager" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="Например: Артём." />
-      </label>
-
-      <label class="block">
-        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Ресторан.</span>
-        <input id="restaurant" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="Например: 12714 — KFC Essentai Mall." />
-      </label>
-
-      <label class="block">
-        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Причина.</span>
-        <select id="reason" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none">
-          <option>Внешние факторы</option>
-          <option>Отсутствие продукта</option>
-          <option>Персонал</option>
-          <option>Внутренние факторы</option>
-        </select>
-      </label>
-
-      <label class="block">
-        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Сумма потерь, ₸.</span>
-        <input id="amount" type="number" inputmode="numeric" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none text-[#E4002B] font-black text-xl" placeholder="0" />
-      </label>
-
-      <label class="block">
-        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Период (текстом).</span>
-        <input id="period" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="01.01.2026 10:00 — 01.01.2026 11:00." />
-      </label>
-
-      <label class="block">
-        <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Детали.</span>
-        <textarea id="comment" rows="4" class="mt-1 w-full bg-[#1C1C1E] border border-white/10 rounded-xl px-4 py-3 outline-none" placeholder="Коротко опиши ситуацию."></textarea>
-      </label>
-    </div>
-
-    <div class="mt-5">
-      <button id="sendBtn" class="w-full bg-[#E4002B] py-4 rounded-2xl font-black text-lg active:scale-[0.98] transition">
-        Отправить.
+      <button onclick="confirmReset()" class="text-gray-600 active:scale-90 transition-transform">
+        <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
+    </header>
 
-      <div id="status" class="mt-3 text-[12px] text-gray-400"></div>
-    </div>
+    <main id="view-container" class="flex-1 overflow-y-auto px-6 py-6 pb-48"></main>
+
+    <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/95 backdrop-blur-xl border-t border-white/5">
+      <div class="flex flex-col gap-3">
+        <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white">Завершить позже</button>
+        <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-all uppercase tracking-tight shadow-2xl">Далее</button>
+      </div>
+    </footer>
   </div>
 
   <script>
+    // Telegram WebApp init
     const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      document.getElementById("tg-badge").textContent = "TELEGRAM";
-    }
+    if (tg) { tg.ready(); tg.expand(); }
 
-    function nowStr() {
+    const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+    const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+
+    const dataTU = {
+      "Zhaidary Talapova": ["12734 — KFC ATAKENT","12774 — KFC Asia Park Almaty","12775 — KFC MAGNUM – RELOCATION","12776 — KFC Malika","12777 — KFC Sever – Shymkent City","12779 — KFC Mart","12799 — KFC Saryarka Almaty","12800 — KFC Masato","12801 — KFC Aksai","12807 — KFC SPUTNIK MALL","12819 — KFC GRAND PARK ALMATY","12832 — KFC ALMATY AIRPORT"],
+      "Valeriya Toishiyeva": ["12748 — KFC Shymkent Plaza","12758 — KFC VAZ","12760 — KFC LEMON","12798 — KFC Compass","12804 — KFC GRES","12824 — KFC MEGA MALL SHYMKENT","12839 — KFC Shymkent Tashkent RP","12841 — KFC Dala Mall Shymkent","12843 — KFC Shymkent City Mall"],
+      "Ulan Toiganbayev": ["12711 — KFC ADK","12712 — KFC Googla","12725 — KFC Mega Park","12729 — KFC Tole Bi","12730 — KFC Moscow Mall","12747 — KFC Central Stadium – Akotobe","12753 — KFC Keruen City Mall – Aktobe","12756 — KFC SILKWAY CITY","12773 — KFC TSUM"],
+      "Nurlan Ataibekov": ["12703 — KFC Mega Almaty","12704 — KFC Domillion","12713 — KFC Aport","12732 — KFC Adem","12761 — KFC Kulager","12770 — KFC Ainabulak","12790 — KFC Kaskelen","12808 — KFC COMPASS BISHKEK HIGHWAY","12816 — KFC APORT MIAMI"],
+      "Nikol Tyurina": ["12702 — KFC Mega Astana","12715 — KFC City Mall Karaganda","12723 — KFC Bogembay","12728 — KFC Green","12731 — KFC Flag Karaganda","12755 — KFC LITE ASTRAHANKA","12810 — KFC TEMIRTAU","12814 — KFC SYGANAK","12818 — KFC Food City Astana","12828 — KFC INCITY ASTANA"],
+      "Lolokhon Makhmudova": ["12709 — KFC Maxima","12722 — KFC Dostik Plaza","12743 — KFC Bualan Sholak","12746 — KFC Forum Mall","12795 — KFC Globus","12811 — KFC APORT KULDZHA","12813 — KFC RP DOSTYK","12842 — KFC YASSY APARTMENTS TURKESTAN"],
+      "Irina Zelenkevich": ["12716 — KFC Merey","12740 — KFC Aktau","12754 — KFC AK KALA MALL","12763 — KFC Shum Mall – Aktau","12778 — KFC Atameken","12780 — KFC Taraz","12791 — KFC Kyzylorda","12829 — KFC ZHAISAN"],
+      "Igor Sokharev": ["12710 — KFC Keruen","12726 — KFC Oasis","12738 — KFC GOLDEN KEY","12745 — KFC Mega Expo","12782 — KFC NOMAD NEW","12786 — KFC Mart, Kostanay city","12809 — KFC DOSTYK MALL PETROPAVLOVSK","12826 — KFC KOSTANAY PLAZA","12827 — KFC KOKSHETAU AUEZOVA"],
+      "Artyom Denissenko": ["12706 — KFC Manasa","12708 — KFC Khan Shatour","12720 — KFC Respublika","12724 — KFC Mechta","12733 — KFC Asia Park","12796 — KFC Magnum Edil","12803 — KFC VSTRECHA","12821 — KFC ZHYBEK ZHOLY COMPASS","12830 — KFC NURLY ZHOL ASTANA"],
+      "Andrey Nacharov": ["12736 — KFC Batyr Mall","12737 — KFC Sarayarka","12751 — KFC UST Kamenogorsk","12772 — KFC Kutuzova Pavlodar","12783 — KFC MAXI MALL EKIBASTUZ","12784 — KFC MAXI MALL OSKEMEN","12787 — KFC Koschi","12825 — KFC CENTRAL PARK SEMEY"],
+      "Alyona Rainskaya": ["12714 — KFC Essentai Mall","12741 — KFC Atrau","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"]
+    };
+
+    const STORAGE_KEY = 'kfc_loss_pro_v9';
+    let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { reports: [], drafts: [] };
+
+    let state = {
+      view: 'main', manager: '', restaurant: '', reason: '', comment: '',
+      start: null, end: null, stage: 'start', amount: 0,
+      filter: 'all',
+      analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
+      analyticsTab: 'restaurants',
+      draftId: null
+    };
+
+    let historyStack = ['main'];
+
+    function getNow() {
       const d = new Date();
-      const dd = String(d.getDate()).padStart(2, "0");
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const yy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mi = String(d.getMinutes()).padStart(2, "0");
-      return `${dd}.${mm}.${yy} ${hh}:${mi}`;
+      return { day:d.getDate(), month:d.getMonth(), year:d.getFullYear(), hour:d.getHours(), min:d.getMinutes(), ts:d.getTime() };
     }
 
-    const statusEl = document.getElementById("status");
-    const btn = document.getElementById("sendBtn");
+    function render() {
+      const container = document.getElementById('view-container');
+      const footer = document.getElementById('footer-actions');
+      const backBtn = document.getElementById('back-btn');
+      const title = document.getElementById('header-title');
+      const laterBtn = document.getElementById('later-btn');
 
-    btn.addEventListener("click", async () => {
-      statusEl.textContent = "";
-      btn.disabled = true;
-      btn.textContent = "Отправляю.";
+      container.innerHTML = '';
+      backBtn.classList.toggle('hidden', state.view === 'main');
+      footer.classList.add('hidden');
+      laterBtn.classList.remove('hidden');
 
-      try {
-        const manager = document.getElementById("manager").value.trim();
-        const restaurant = document.getElementById("restaurant").value.trim();
-        const reason = document.getElementById("reason").value.trim();
-        const amount = Number(document.getElementById("amount").value);
-        const period = document.getElementById("period").value.trim();
-        const comment = document.getElementById("comment").value.trim();
+      if (state.view === 'main') {
+        title.innerText = "KFC";
+        container.innerHTML = `
+          <div class="grid grid-cols-2 gap-4 mb-8">
+            <button onclick="startFlow()" class="ios-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500 active:scale-95 transition-all">
+              <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-[#E4002B]"><i data-lucide="plus"></i></div>
+              <span class="font-bold text-[10px] uppercase tracking-widest text-gray-400">Внести потери</span>
+            </button>
+            <button onclick="navigate('analytics_period')" class="ios-card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
+              <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-500"><i data-lucide="bar-chart-3"></i></div>
+              <span class="font-bold text-[10px] uppercase tracking-widest text-gray-400">Аналитика</span>
+            </button>
+          </div>
 
-        if (!manager || !restaurant || !reason) {
-          statusEl.textContent = "Заполни менеджера, ресторан и причину.";
-          return;
-        }
-        if (!Number.isFinite(amount) || amount <= 0) {
-          statusEl.textContent = "Укажи сумму больше нуля.";
-          return;
-        }
+          ${db.drafts.length ? `
+          <div class="mb-8">
+            <p class="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-3 px-1">Черновики</p>
+            <div class="space-y-3">
+              ${db.drafts.map(d => `
+                <div class="relative group">
+                  <button onclick="resumeDraft('${d.draftId}')" class="w-full ios-card p-4 flex items-center justify-between active:scale-[0.98] transition-all border-l-2 border-red-500/30">
+                    <div class="text-left overflow-hidden mr-2">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="draft-badge">Продолжить</span>
+                        <span class="text-[9px] font-bold text-gray-500 uppercase">${d.manager || '...'}</span>
+                      </div>
+                      <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(' — ')[1] : 'Новый отчет'}</p>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-700"></i>
+                  </button>
+                  <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          </div>` : ''}
 
-        const start = period ? period.split("—")[0]?.trim() : nowStr();
-        const end = period ? period.split("—")[1]?.trim() : nowStr();
+          <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
+            <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500"><i data-lucide="history"></i></div>
+            <span class="font-bold text-xs uppercase tracking-widest text-gray-400">История записей</span>
+          </button>
+        `;
+      }
 
-        const payload = {
-          manager,
-          restaurant,
-          reason,
-          amount,
-          start: start || nowStr(),
-          end: end || nowStr(),
-          comment: comment || "-"
+      else if (state.view === 'managers') {
+        title.innerText = "Менеджер";
+        Object.keys(dataTU).sort().forEach(m => {
+          container.innerHTML += `<button onclick="state.manager='${m}';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
+        });
+      }
+
+      else if (state.view === 'restaurants') {
+        title.innerText = "Ресторан";
+        dataTU[state.manager].forEach(r => {
+          container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
+        });
+      }
+
+      else if (state.view === 'reasons') {
+        title.innerText = "Причина";
+        ["Внешние факторы", "Отсутствие продукта", "Персонал", "Внутренние факторы"].forEach(r => {
+          container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
+        });
+      }
+
+      else if (state.view === 'comment') {
+        title.innerText = "Детали";
+        container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
+        footer.classList.remove('hidden');
+        document.getElementById('primary-btn').innerText = "Далее";
+        document.getElementById('primary-btn').onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
+      }
+
+      else if (state.view === 'calendar') {
+        const isStart = state.stage === 'start';
+        const cur = isStart ? state.start : state.end;
+        title.innerText = isStart ? "Начало" : "Конец";
+        const firstDay = (new Date(cur.year, cur.month, 1).getDay() || 7) - 1;
+        const daysInMonth = new Date(cur.year, cur.month + 1, 0).getDate();
+
+        container.innerHTML = `
+          <div class="ios-card p-5">
+            ${!isStart ? `
+              <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                <p class="text-[8px] uppercase font-black text-blue-500 mb-1 tracking-widest">Начало</p>
+                <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${state.start.hour}:${state.start.min.toString().padStart(2,'0')}</p>
+              </div>` : ''}
+
+            <div class="flex justify-between items-center mb-6">
+              <span class="text-lg font-bold">${cur.day} ${monthNamesGenitive[cur.month]}</span>
+              <div class="wheel-box">
+                <div class="wheel" id="h-w"></div>
+                <span class="text-blue-500 px-1">:</span>
+                <div class="wheel" id="m-w"></div>
+              </div>
+            </div>
+
+            <div class="flex gap-2 mb-6 justify-center">
+              <select onchange="updateFlowDate('month', this.value)" class="ios-select">
+                ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
+              <select onchange="updateFlowDate('year', this.value)" class="ios-select">
+                ${[2024, 2025, 2026].map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="cal-grid">
+              ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+              ${Array.from({length: firstDay}).map(() => `<div></div>`).join('')}
+              ${Array.from({length: daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?'selected':''}">${i+1}</div>`).join('')}
+            </div>
+          </div>
+        `;
+
+        initWheels(cur);
+
+        footer.classList.remove('hidden');
+        document.getElementById('primary-btn').innerText = isStart ? "Установить конец" : "Далее";
+        document.getElementById('primary-btn').onclick = () => {
+          const v = getWheels();
+          if (isStart) {
+            state.start.hour=v.h; state.start.min=v.m;
+            state.stage='end';
+            state.end = JSON.parse(JSON.stringify(state.start));
+            render();
+          } else {
+            state.end.hour=v.h; state.end.min=v.m;
+            navigate('sum');
+          }
         };
+      }
 
+      else if (state.view === 'sum') {
+        title.innerText = "Сумма";
+        container.innerHTML = `
+          <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
+            <p class="text-[10px] text-gray-500 font-black uppercase mb-1 tracking-widest">Детали периода</p>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold">${state.start.day}.${state.start.month+1} ${state.start.hour}:${state.start.min.toString().padStart(2,'0')}</span>
+              <i data-lucide="arrow-right" class="w-3 h-3 text-gray-400"></i>
+              <span class="text-xs font-bold">${state.end.day}.${state.end.month+1} ${state.end.hour}:${state.end.min.toString().padStart(2,'0')}</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center py-12">
+            <input type="number" id="sum-input" placeholder="0" value="${state.amount || ''}" class="text-6xl font-black" oninput="scaleSumInput(this)">
+            <p class="text-[10px] text-gray-500 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
+          </div>
+        `;
+        footer.classList.remove('hidden');
+        document.getElementById('primary-btn').innerText = "Завершить";
+        document.getElementById('primary-btn').onclick = saveReport;
+        setTimeout(() => {
+          const inp = document.getElementById('sum-input');
+          if(inp){ inp.focus(); scaleSumInput(inp); }
+        }, 100);
+      }
+
+      else if (state.view === 'analytics_period') {
+        title.innerText = "Аналитика";
+        [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}].forEach(opt => {
+          container.innerHTML += `<button onclick="${opt.id==='custom'?'navigate(\\'analytics_custom\\')':'state.filter=\\''+opt.id+'\\';navigate(\\'analytics_view\\')'}" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${opt.n}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
+        });
+      }
+
+      else if (state.view === 'analytics_custom') {
+        title.innerText = "Период";
+        const cal = state.analyticsCal;
+        const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
+        const daysInMonth = new Date(cal.year, cal.month + 1, 0).getDate();
+
+        container.innerHTML = `
+          <div class="ios-card p-5">
+            <div class="flex justify-between items-center mb-6">
+              <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5"><i data-lucide="chevron-left"></i></button>
+              <span class="font-bold text-sm uppercase tracking-widest">${monthNames[cal.month]} ${cal.year}</span>
+              <button onclick="changeCalMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5"><i data-lucide="chevron-right"></i></button>
+            </div>
+
+            <div class="cal-grid">
+              ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+              ${Array.from({length: firstDay}).map(() => `<div></div>`).join('')}
+              ${Array.from({length: daysInMonth}).map((_, i) => {
+                const ts = new Date(cal.year, cal.month, i+1).getTime();
+                const sel = (cal.start && ts === cal.start) || (cal.end && ts === cal.end);
+                const rng = cal.start && cal.end && ts > cal.start && ts < cal.end;
+                return `<div onclick="setAnalyticsDate(${ts})" class="day-btn ${sel?'selected':''} ${rng?'range':''}">${i+1}</div>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        if(cal.start && cal.end){
+          footer.classList.remove('hidden');
+          laterBtn.classList.add('hidden');
+          document.getElementById('primary-btn').innerText = "Показать";
+          document.getElementById('primary-btn').onclick = () => { state.filter='custom'; navigate('analytics_view'); };
+        }
+      }
+
+      else if (state.view === 'analytics_view') {
+        title.innerText = "Итоги";
+        const filtered = filterAnalytics(db.reports);
+        const totalSum = filtered.reduce((a,b)=>a+b.amount,0);
+
+        container.innerHTML = `
+          <div class="ios-card p-6 mb-4 text-center bg-gradient-to-b from-white/5 to-transparent">
+            <p class="text-[10px] text-gray-500 font-black uppercase mb-1 tracking-widest">Общие потери</p>
+            <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
+            <button onclick="exportExcel()" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-500/10 text-green-500 py-3 rounded-xl font-bold text-[10px] uppercase active:scale-95 transition-all">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Скачать Excel
+            </button>
+          </div>
+
+          <div class="flex border-b border-white/5 mb-6 sticky top-0 bg-black z-10">
+            <button onclick="state.analyticsTab='restaurants';render()" class="tab-btn ${state.analyticsTab==='restaurants'?'active':''}">Рестораны</button>
+            <button onclick="state.analyticsTab='reasons';render()" class="tab-btn ${state.analyticsTab==='reasons'?'active':''}">Причины</button>
+          </div>
+
+          <div class="space-y-4 pb-24">
+            ${state.analyticsTab === 'restaurants' ? renderRestList(filtered, totalSum) : renderReasonList(filtered, totalSum)}
+          </div>
+        `;
+      }
+
+      else if (state.view === 'history') {
+        title.innerText = "История";
+        container.innerHTML = `<div class="space-y-3 pb-20">${
+          db.reports.slice().reverse().map(r => `
+            <div class="ios-card p-4">
+              <div class="flex justify-between mb-1">
+                <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${r.manager}</span>
+                <span class="text-sm font-black text-red-500">${r.amount.toLocaleString()} ₸</span>
+              </div>
+              <p class="text-xs font-bold truncate">${r.restaurant.split(' — ')[1]}</p>
+              <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">${r.start.day}.${r.start.month+1} - ${r.end.day}.${r.end.month+1}</p>
+            </div>
+          `).join('')
+        }</div>`;
+      }
+
+      lucide.createIcons();
+    }
+
+    function renderRestList(reports,total){
+      const grouped = {};
+      reports.forEach(r => grouped[r.restaurant]=(grouped[r.restaurant]||0)+r.amount);
+      return Object.entries(grouped).sort((a,b)=>b[1]-a[1]).map(([name,sum])=>{
+        const perc = total>0 ? ((sum/total)*100).toFixed(1) : 0;
+        return `<div class="ios-card p-4">
+          <div class="flex justify-between items-start mb-1">
+            <div class="flex flex-col max-w-[70%]">
+              <span class="text-xs font-bold truncate">${name.split(' — ')[1]}</span>
+              <span class="text-[9px] text-gray-500 font-bold uppercase">${name.split(' — ')[0]}</span>
+            </div>
+            <div class="text-right flex flex-col items-end">
+              <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
+              <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
+            </div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
+        </div>`;
+      }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>';
+    }
+
+    function renderReasonList(reports,total){
+      const grouped = {};
+      reports.forEach(r => grouped[r.reason]=(grouped[r.reason]||0)+r.amount);
+      return Object.entries(grouped).sort((a,b)=>b[1]-a[1]).map(([reason,sum])=>{
+        const perc = total>0 ? ((sum/total)*100).toFixed(1) : 0;
+        return `<div class="ios-card p-4">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
+            <div class="text-right flex flex-col items-end">
+              <span class="text-sm font-black text-red-500">${sum.toLocaleString()} ₸</span>
+              <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
+            </div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
+        </div>`;
+      }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>';
+    }
+
+    function saveDraft(){
+      if(state.view==='calendar'){
+        const v=getWheels();
+        if(state.stage==='start'){ state.start.hour=v.h; state.start.min=v.m; }
+        else { state.end.hour=v.h; state.end.min=v.m; }
+      }
+      if(state.view==='comment') state.comment = document.getElementById('comm').value;
+      if(state.view==='sum') state.amount = parseInt(document.getElementById('sum-input').value) || 0;
+
+      if(!state.draftId) state.draftId='d_'+Date.now();
+      const idx=db.drafts.findIndex(d=>d.draftId===state.draftId);
+      if(idx!==-1) db.drafts[idx]=JSON.parse(JSON.stringify(state));
+      else db.drafts.push(JSON.parse(JSON.stringify(state)));
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      state.view='main'; historyStack=['main']; render();
+    }
+
+    function resumeDraft(id){
+      const d=db.drafts.find(it=>it.draftId===id);
+      if(d){
+        state=JSON.parse(JSON.stringify(d));
+        state.view='calendar';
+        state.stage='end';
+        if(!state.end) state.end=JSON.parse(JSON.stringify(state.start));
+        historyStack=['main','calendar'];
+        render();
+      }
+    }
+
+    function deleteDraft(id){
+      db.drafts=db.drafts.filter(d=>d.draftId!==id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      render();
+    }
+
+    function exportExcel(){
+      const reps = filterAnalytics(db.reports);
+      if(!reps.length) return;
+
+      const data = reps.map(r => {
+        const startD = new Date(r.start.year,r.start.month,r.start.day,r.start.hour,r.start.min);
+        const endD = new Date(r.end.year,r.end.month,r.end.day,r.end.hour,r.end.min);
+        const diffHours = ((endD-startD)/(1000*60*60)).toFixed(2);
+        return {
+          'ТУ': r.manager,
+          'Ресторан': r.restaurant,
+          'Причина': r.reason,
+          'Комментарий': r.comment || '-',
+          'Начало': `${r.start.day}.${r.start.month+1}.${r.start.year} ${r.start.hour}:${r.start.min.toString().padStart(2,'0')}`,
+          'Конец': `${r.end.day}.${r.end.month+1}.${r.end.year} ${r.end.hour}:${r.end.min.toString().padStart(2,'0')}`,
+          'Длительность (ч)': parseFloat(diffHours),
+          'Сумма потерь': r.amount
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for(let R=range.s.r+1; R<=range.e.r; ++R){
+        const cellAddress = XLSX.utils.encode_cell({c:7, r:R});
+        if(!ws[cellAddress]) continue;
+        ws[cellAddress].t='n';
+        ws[cellAddress].z='#,##0 "₸"';
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Потери");
+      XLSX.writeFile(wb, `KFC_Loss_Report_${new Date().toLocaleDateString()}.xlsx`);
+    }
+
+    // ✅ ВАЖНО: отправка через backend (/api/send), а не напрямую по токену.
+    async function saveReport(){
+      const val = parseInt(document.getElementById('sum-input').value) || 0;
+      if(val<=0) return;
+
+      state.amount = val;
+      state.start.ts = new Date(state.start.year,state.start.month,state.start.day,state.start.hour,state.start.min).getTime();
+
+      const payload = {
+        manager: state.manager,
+        restaurant: state.restaurant,
+        reason: state.reason,
+        amount: state.amount,
+        start: `${state.start.day}.${state.start.month+1}.${state.start.year} ${state.start.hour}:${state.start.min.toString().padStart(2,'0')}`,
+        end: `${state.end.day}.${state.end.month+1}.${state.end.year} ${state.end.hour}:${state.end.min.toString().padStart(2,'0')}`,
+        comment: state.comment || "-"
+      };
+
+      try{
         const resp = await fetch("/api/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
           body: JSON.stringify(payload)
         });
 
-        const data = await resp.json().catch(() => ({}));
-
-        if (!resp.ok || !data.ok) {
-          statusEl.textContent = `Ошибка отправки: ${data.error || resp.status}`;
+        const data = await resp.json().catch(()=>({}));
+        if(!resp.ok || !data.ok){
+          if(tg) tg.showPopup({ title:"Ошибка", message:`Не отправилось: ${data.error || resp.status}`, buttons:[{type:"ok"}] });
           return;
         }
 
-        statusEl.textContent = "Готово. Сообщение отправлено в Telegram.";
-        if (tg) tg.showPopup({ title: "Готово.", message: "Отчёт отправлен в Telegram.", buttons: [{ type: "ok" }] });
-      } catch (e) {
-        statusEl.textContent = `Ошибка: ${e?.message || "unknown"}`;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Отправить.";
+        db.reports.push(JSON.parse(JSON.stringify(state)));
+        if(state.draftId) db.drafts = db.drafts.filter(d=>d.draftId!==state.draftId);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+
+        if(tg) tg.showPopup({ title:"Готово", message:"Отчёт отправлен в Telegram.", buttons:[{type:"ok"}] });
+
+        state.view='main'; historyStack=['main']; render();
+      }catch(e){
+        if(tg) tg.showPopup({ title:"Ошибка", message:`Сеть/сервер: ${e?.message || "unknown"}`, buttons:[{type:"ok"}] });
       }
-    });
+    }
+
+    function startFlow(){
+      state = {
+        view:'managers',
+        manager:'', restaurant:'', reason:'', comment:'',
+        start:getNow(), end:getNow(), stage:'start', amount:0,
+        filter: state.filter,
+        analyticsCal: state.analyticsCal,
+        analyticsTab: 'restaurants',
+        draftId: null
+      };
+      navigate('managers');
+    }
+
+    function navigate(v){ historyStack.push(v); state.view=v; render(); }
+    function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
+    function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
+    function updateFlowDate(p,v){ const cur = state.stage==='start' ? state.start : state.end; cur[p]=parseInt(v); render(); }
+
+    function setAnalyticsDate(ts){
+      if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
+        state.analyticsCal.start=ts; state.analyticsCal.end=null;
+      } else {
+        if(ts < state.analyticsCal.start){ state.analyticsCal.end=state.analyticsCal.start; state.analyticsCal.start=ts; }
+        else state.analyticsCal.end=ts;
+      }
+      render();
+    }
+
+    function changeCalMonth(s){
+      state.analyticsCal.month += s;
+      if(state.analyticsCal.month>11){ state.analyticsCal.month=0; state.analyticsCal.year++; }
+      if(state.analyticsCal.month<0){ state.analyticsCal.month=11; state.analyticsCal.year--; }
+      render();
+    }
+
+    function scaleSumInput(input){
+      const val=input.value;
+      if(val.length>7) input.style.fontSize='32px';
+      else if(val.length>5) input.style.fontSize='44px';
+      else input.style.fontSize='60px';
+    }
+
+    function filterAnalytics(reports){
+      const now=new Date();
+      const startOfToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+      return reports.filter(r=>{
+        if(state.filter==='today') return r.start.ts >= startOfToday;
+        if(state.filter==='week') return r.start.ts >= (startOfToday - (now.getDay() || 7 - 1) * 86400000);
+        if(state.filter==='custom') return r.start.ts >= state.analyticsCal.start && r.start.ts <= (state.analyticsCal.end + 86400000);
+        return true;
+      });
+    }
+
+    function initWheels(t){
+      setTimeout(()=>{
+        const h=document.getElementById('h-w'), m=document.getElementById('m-w');
+        if(!h||!m) return;
+        h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${i.toString().padStart(2,'0')}</div>`).join('');
+        m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${i.toString().padStart(2,'0')}</div>`).join('');
+        h.scrollTop=t.hour*52; m.scrollTop=t.min*52;
+
+        const sync=(el)=>{
+          const idx=Math.round(el.scrollTop/52);
+          el.querySelectorAll('.wheel-item').forEach((it,i)=>it.classList.toggle('active',i===idx));
+        };
+        h.onscroll=()=>sync(h);
+        m.onscroll=()=>sync(m);
+        sync(h); sync(m);
+      },10);
+    }
+
+    function getWheels(){
+      const h=document.getElementById('h-w'), m=document.getElementById('m-w');
+      return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
+    }
+
+    function confirmReset(){
+      if(confirm("Внимание! Это удалит ВСЕ записи и черновики. Продолжить?")){
+        db={reports:[],drafts:[]};
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        render();
+      }
+    }
+
+    // ✅ без window.onload — надёжнее
+    render();
   </script>
 </body>
 </html>
