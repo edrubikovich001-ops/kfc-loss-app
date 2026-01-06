@@ -85,8 +85,62 @@
   };
 
   // Черновики оставляем локально.
-  const STORAGE_KEY = 'kfc_loss_pro_v10_drafts';
-  let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { reports: [], drafts: [] };
+  const STORAGE_KEY = 'kfc_loss_pro_v10';
+
+// reports — ТОЛЬКО с сервера.
+// drafts — локально (это нормально).
+let db = { reports: [], drafts: [] };
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  db.drafts = Array.isArray(saved.drafts) ? saved.drafts : [];
+} catch (_) {
+  db.drafts = [];
+}
+
+// --- helpers ---
+function saveDraftsToLS() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
+}
+
+function parseRuDT(s) {
+  // "07.01.2026 02:21"
+  if (!s || typeof s !== "string") return null;
+  const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
+  const d = new Date(yy, mm, dd, hh, mi);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function toFlowObjFromServer(row) {
+  // row: {id, manager, restaurant, reason, amount, start, end, comment, created_at}
+  const sd = parseRuDT(row.start) || new Date(row.created_at || Date.now());
+  const ed = parseRuDT(row.end) || sd;
+
+  return {
+    id: row.id,
+    manager: row.manager,
+    restaurant: row.restaurant,
+    reason: row.reason,
+    comment: row.comment || "",
+    amount: Number(row.amount) || 0,
+
+    // для фильтров/аналитики
+    start: { day: sd.getDate(), month: sd.getMonth(), year: sd.getFullYear(), hour: sd.getHours(), min: sd.getMinutes(), ts: sd.getTime() },
+    end:   { day: ed.getDate(), month: ed.getMonth(), year: ed.getFullYear(), hour: ed.getHours(), min: ed.getMinutes(), ts: ed.getTime() },
+
+    created_at: row.created_at || Date.now()
+  };
+}
+
+async function loadReportsFromServer() {
+  const resp = await fetch("/api/reports");
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  db.reports = (data.reports || []).map(toFlowObjFromServer);
+}
+
   db.reports = []; // reports всегда с сервера.
 
   let state = {
