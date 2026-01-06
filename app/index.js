@@ -107,7 +107,7 @@ app.post("/api/reports", async (req, res) => {
 
     // Отправка в Telegram (опционально)
     const BOT_TOKEN = process.env.BOT_TOKEN;
-    const TG_CHAT_ID = process.env.TG_CHAT_ID;
+    const TG_CHAT_ID = process.env.CHAT_ID;
     if (BOT_TOKEN && TG_CHAT_ID) {
       const text =
         `🚨 ОТЧЕТ ПО ПОТЕРЯМ\n\n` +
