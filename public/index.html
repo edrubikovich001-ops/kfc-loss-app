@@ -625,41 +625,50 @@ async function loadReportsFromServer() {
 }
 
 
-  function editReport(id) {
-    const r = db.reports.find(x => x.id === id);
-    if (!r) { alert("Запись не найдена."); return; }
+function editReport(id) {
+  const r = db.reports.find(x => x.id === id);
+  if (!r) return;
 
-    state = {
-      view:'managers',
-      manager: r.manager,
-      restaurant: r.restaurant,
-      reason: r.reason,
-      comment: r.comment || '',
-      start: JSON.parse(JSON.stringify(r.start)),
-      end: JSON.parse(JSON.stringify(r.end)),
-      stage:'start',
-      amount: r.amount,
-      filter: state.filter,
-      analyticsCal: state.analyticsCal,
-      analyticsTab: state.analyticsTab || 'restaurants',
-      draftId: null,
-      editId: id
-    };
+  state = {
+    view:'comment',
+    manager: r.manager,
+    restaurant: r.restaurant,
+    reason: r.reason,
+    comment: r.comment || '',
+    start: JSON.parse(JSON.stringify(r.start)),
+    end: JSON.parse(JSON.stringify(r.end)),
+    stage:'start',
+    amount: r.amount || 0,
 
-    historyStack = ['main','history','managers'];
-    render();
-  }
+    filter: state.filter,
+    analyticsCal: state.analyticsCal,
+    analyticsTab: state.analyticsTab || 'restaurants',
 
-  async function confirmDelete(id) {
-    if (!confirm("Удалить запись?")) return;
-    try {
-      await apiJson(`${API}/reports/${id}`, { method: "DELETE" });
-      await loadReportsFromServer();
-      render();
-    } catch (e) {
-      alert("Не удалось удалить: " + (e?.message || e));
+    draftId: null,
+    editId: id
+  };
+
+  historyStack = ['main','history','comment'];
+  render();
+}
+
+async function deleteReport(id) {
+  if (!confirm("Удалить этот инцидент?")) return;
+
+  try {
+    const resp = await fetch(`/api/reports/${id}`, { method: "DELETE" });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) {
+      alert(`Ошибка удаления: ${data.error || resp.status}`);
+      return;
     }
+    await loadReportsFromServer();
+    render();
+  } catch (e) {
+    alert("Ошибка: " + (e?.message || e));
   }
+}
+
 
   function startFlow() {
     state = {
