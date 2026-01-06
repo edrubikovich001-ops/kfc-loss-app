@@ -781,20 +781,14 @@ async function deleteReport(id) {
   }
 
   window.addEventListener('load', async () => {
-    try {
-      // Достаём черновики локально.
-      const local = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-      db.drafts = local.drafts || [];
-
-      // Достаём reports с сервера.
-      await loadReportsFromServer();
-
-      render();
-    } catch (e) {
-      alert("Ошибка загрузки: " + (e?.message || e));
-      try { render(); } catch (_) {}
-    }
-  });
+  try {
+    await loadReportsFromServer();
+    render();
+  } catch (e) {
+    alert("Ошибка загрузки данных: " + (e?.message || e));
+    render(); // хотя бы интерфейс покажем
+  }
+});
 </script>
 </body>
 </html>
