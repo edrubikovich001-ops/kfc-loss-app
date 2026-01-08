@@ -24,6 +24,8 @@ app.use(express.static(publicDir));
  * TG_CHAT_ID    - chat_id куда слать (опционально)
  */
 const DATABASE_URL = process.env.DATABASE_URL;
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const TG_CHAT_ID = process.env.TG_CHAT_ID;
 
 if (!DATABASE_URL) {
   console.error("FATAL: DATABASE_URL is missing. Set it in Render Environment.");
@@ -31,13 +33,12 @@ if (!DATABASE_URL) {
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false }
+  ssl: DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false },
 });
 
 // --- helpers ---
 async function q(text, params) {
-  const r = await pool.query(text, params);
-  return r;
+  return pool.query(text, params);
 }
 
 function parseRuDT(s) {
@@ -45,7 +46,11 @@ function parseRuDT(s) {
   if (!s || typeof s !== "string") return null;
   const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!m) return null;
-  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
+  const dd = Number(m[1]),
+    mm = Number(m[2]) - 1,
+    yy = Number(m[3]),
+    hh = Number(m[4]),
+    mi = Number(m[5]);
   const d = new Date(yy, mm, dd, hh, mi);
   if (Number.isNaN(d.getTime())) return null;
   return d;
@@ -59,11 +64,34 @@ function hoursDiff(startStr, endStr) {
   return Math.round(diff * 100) / 100; // 2 знака
 }
 
+function normalizeStr(x) {
+  return String(x ?? "").trim().replace(/\s+/g, " ");
+}
+
+/**
+ * ВАЖНО:
+ * Если фронт НЕ прислал request_id, делаем стабильный request_id сами:
+ * хеш по ключевым полям. Тогда повторная отправка того же payload не создаст дубль.
+ */
+function makeRequestIdFromPayload({ manager, restaurant, reason, amount, start, end, comment }) {
+  const base = [
+    normalizeStr(manager),
+    normalizeStr(restaurant),
+    normalizeStr(reason),
+    String(Number(amount) || 0),
+    normalizeStr(start),
+    normalizeStr(end),
+    normalizeStr(comment),
+  ].join("|");
+
+  return crypto.createHash("sha256").update(base).digest("hex").slice(0, 32);
+}
+
 async function ensureSchema() {
   await q(`
     CREATE TABLE IF NOT EXISTS reports (
       id BIGSERIAL PRIMARY KEY,
-      request_id TEXT UNIQUE,
+      request_id TEXT NOT NULL UNIQUE,
       manager TEXT NOT NULL,
       restaurant TEXT NOT NULL,
       reason TEXT NOT NULL,
@@ -98,47 +126,53 @@ app.get("/api/reports", async (req, res) => {
   }
 });
 
-// create (с защитой от дубля по request_id)
+// create (антидубль)
 app.post("/api/reports", async (req, res) => {
   try {
-    const { manager, restaurant, reason, amount, start, end, comment, request_id } = req.body || {};
+    const body = req.body || {};
+    const manager = normalizeStr(body.manager);
+    const restaurant = normalizeStr(body.restaurant);
+    const reason = normalizeStr(body.reason);
+    const comment = normalizeStr(body.comment || "");
+    const start = normalizeStr(body.start || "");
+    const end = normalizeStr(body.end || "");
+    const nAmount = Number(body.amount);
 
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
     }
-    const nAmount = Number(amount);
     if (!Number.isFinite(nAmount) || nAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
     }
 
-    const created_at = Date.now();
-    const rid = (request_id && String(request_id).trim()) || crypto.randomUUID();
+    // request_id:
+    // - если фронт прислал: используем его
+    // - иначе: делаем стабильный хеш из payload (это и убирает дубли)
+    const rid = normalizeStr(body.request_id) || makeRequestIdFromPayload({
+      manager,
+      restaurant,
+      reason,
+      amount: nAmount,
+      start,
+      end,
+      comment,
+    });
 
-    // INSERT ... ON CONFLICT DO NOTHING → если дубль, просто вернём существующую запись
+    const created_at = Date.now();
+
     await q(
       `
       INSERT INTO reports (request_id, manager, restaurant, reason, comment, start, "end", amount, created_at)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       ON CONFLICT (request_id) DO NOTHING
       `,
-      [
-        rid,
-        String(manager).trim(),
-        String(restaurant).trim(),
-        String(reason).trim(),
-        comment ? String(comment) : "",
-        start ? String(start) : "",
-        end ? String(end) : "",
-        Math.round(nAmount),
-        created_at
-      ]
+      [rid, manager, restaurant, reason, comment, start, end, Math.round(nAmount), created_at]
     );
 
     const row = (await q(`SELECT * FROM reports WHERE request_id=$1`, [rid])).rows[0];
 
-    // Telegram (опционально)
-    const BOT_TOKEN = process.env.BOT_TOKEN;
-    const TG_CHAT_ID = process.env.TG_CHAT_ID;
+    // Telegram (опционально) — слать только если запись реально есть
+    // (а она будет либо новая, либо уже существующая — но дублей не будет)
     if (BOT_TOKEN && TG_CHAT_ID && row) {
       const text =
         `🚨 ОТЧЕТ ПО ПОТЕРЯМ\n\n` +
@@ -147,16 +181,16 @@ app.post("/api/reports", async (req, res) => {
         `⚠️ Причина: ${row.reason}\n` +
         `💰 Сумма: ${Number(row.amount).toLocaleString()} ₸\n\n` +
         `🕒 Начало: ${row.start || "-"}\n` +
-        `🕒 Конец: ${row.end || "-"}\n\n` +
+        `🕒 Конец: ${row.end || "-"}\n` +
+        `⏱ Длительность: ${hoursDiff(row.start, row.end) || "-"} ч\n\n` +
         `💬 Комментарий: ${row.comment || "-"}`;
 
       try {
-        const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: TG_CHAT_ID, text })
-        });
-        await tgResp.json().catch(() => ({}));
+          body: JSON.stringify({ chat_id: TG_CHAT_ID, text }),
+        }).then((r) => r.json()).catch(() => ({}));
       } catch (_) {}
     }
 
@@ -175,12 +209,18 @@ app.put("/api/reports/:id", async (req, res) => {
     const existing = (await q(`SELECT * FROM reports WHERE id=$1`, [id])).rows[0];
     if (!existing) return res.status(404).json({ ok: false, error: "Not found." });
 
-    const { manager, restaurant, reason, amount, start, end, comment } = req.body || {};
+    const body = req.body || {};
+    const manager = normalizeStr(body.manager);
+    const restaurant = normalizeStr(body.restaurant);
+    const reason = normalizeStr(body.reason);
+    const comment = normalizeStr(body.comment || "");
+    const start = normalizeStr(body.start || "");
+    const end = normalizeStr(body.end || "");
+    const nAmount = Number(body.amount);
 
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
     }
-    const nAmount = Number(amount);
     if (!Number.isFinite(nAmount) || nAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
     }
@@ -192,16 +232,7 @@ app.put("/api/reports/:id", async (req, res) => {
       WHERE id=$8
       RETURNING *
       `,
-      [
-        String(manager).trim(),
-        String(restaurant).trim(),
-        String(reason).trim(),
-        Math.round(nAmount),
-        start ? String(start) : "",
-        end ? String(end) : "",
-        comment ? String(comment) : "",
-        id
-      ]
+      [manager, restaurant, reason, Math.round(nAmount), start, end, comment, id]
     );
 
     res.json({ ok: true, report: r.rows[0] });
@@ -223,11 +254,12 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel (серверный) — с нужными колонками
+// export excel (серверный) — строго в нужном порядке колонок
 app.get("/api/export.xlsx", async (req, res) => {
   try {
     const rows = (await q(`SELECT * FROM reports ORDER BY created_at DESC`)).rows;
 
+    // ВАЖНО: порядок колонок как ты просил
     const data = rows.map((r) => ({
       "ТУ": r.manager,
       "Ресторан": r.restaurant,
@@ -235,8 +267,8 @@ app.get("/api/export.xlsx", async (req, res) => {
       "Комментарий": r.comment || "",
       "Начало инцидента": r.start || "",
       "Конец инцидента": r.end || "",
-      "Длительность (ч)": hoursDiff(r.start, r.end),
-      "Сумма потерь (₸)": Number(r.amount) || 0
+      "Длительность в часах": hoursDiff(r.start, r.end),
+      "Сумма потерь": Number(r.amount) || 0
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -253,15 +285,15 @@ app.get("/api/export.xlsx", async (req, res) => {
       }
     }
 
-    // Чуть “красоты”: ширины колонок
+    // ширины колонок (аккуратно)
     ws["!cols"] = [
       { wch: 22 }, // ТУ
-      { wch: 28 }, // Ресторан
+      { wch: 30 }, // Ресторан
       { wch: 22 }, // Причина
-      { wch: 40 }, // Комментарий
+      { wch: 45 }, // Комментарий
       { wch: 20 }, // Начало
       { wch: 20 }, // Конец
-      { wch: 14 }, // Длительность
+      { wch: 18 }, // Длительность
       { wch: 18 }  // Сумма
     ];
 
