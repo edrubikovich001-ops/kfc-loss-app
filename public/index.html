@@ -46,9 +46,15 @@
         <p class="text-[9px] text-[#E4002B] font-bold tracking-[0.2em] uppercase">Loss Control</p>
       </div>
     </div>
-    <button onclick="refreshFromServer()" class="text-gray-600 active:scale-90 transition-transform" title="Обновить">
-      <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
-    </button>
+
+    <div class="flex items-center gap-3">
+      <button onclick="refreshFromServer(true)" class="text-gray-600 active:scale-90 transition-transform" title="Обновить">
+        <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
+      </button>
+      <button onclick="confirmResetDraftsOnly()" class="text-gray-600 active:scale-90 transition-transform" title="Сбросить черновики">
+        <i data-lucide="trash-2" class="w-5 h-5"></i>
+      </button>
+    </div>
   </header>
 
   <main id="view-container" class="flex-1 overflow-y-auto px-6 py-6 pb-48"></main>
@@ -62,10 +68,12 @@
 </div>
 
 <script>
+  // Telegram WebApp init
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
   const API = "/api";
+  const STORAGE_KEY = "kfc_loss_pro_v10_drafts_only";
 
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
@@ -84,147 +92,93 @@
     "Alyona Rainskaya": ["12714 — KFC Essentai Mall","12741 — KFC Atrau","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"]
   };
 
-  // Черновики оставляем локально.
-  const STORAGE_KEY = 'kfc_loss_pro_v9';
+  // db: reports — только сервер. drafts — локально.
+  let db = { reports: [], drafts: [] };
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    db.drafts = Array.isArray(saved.drafts) ? saved.drafts : [];
+  } catch (_) { db.drafts = []; }
 
-let db = { reports: [], drafts: [] }; // reports только с сервера
-const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { drafts: [] };
-db.drafts = saved.drafts || [];
-
-// reports — ТОЛЬКО с сервера.
-// drafts — локально (это нормально).
-let db = { reports: [], drafts: [] };
-try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  db.drafts = Array.isArray(saved.drafts) ? saved.drafts : [];
-} catch (_) {
-  db.drafts = [];
-}
-
-// --- helpers ---
-function saveDraftsToLS() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
-}
-
-function parseRuDT(s) {
-  // "07.01.2026 02:21"
-  if (!s || typeof s !== "string") return null;
-  const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
-  if (!m) return null;
-  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
-  const d = new Date(yy, mm, dd, hh, mi);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function toFlowObjFromServer(row) {
-  // row: {id, manager, restaurant, reason, amount, start, end, comment, created_at}
-  const sd = parseRuDT(row.start) || new Date(row.created_at || Date.now());
-  const ed = parseRuDT(row.end) || sd;
-
-  return {
-    id: row.id,
-    manager: row.manager,
-    restaurant: row.restaurant,
-    reason: row.reason,
-    comment: row.comment || "",
-    amount: Number(row.amount) || 0,
-
-    // для фильтров/аналитики
-    start: { day: sd.getDate(), month: sd.getMonth(), year: sd.getFullYear(), hour: sd.getHours(), min: sd.getMinutes(), ts: sd.getTime() },
-    end:   { day: ed.getDate(), month: ed.getMonth(), year: ed.getFullYear(), hour: ed.getHours(), min: ed.getMinutes(), ts: ed.getTime() },
-
-    created_at: row.created_at || Date.now()
-  };
-}
-
-async function loadReportsFromServer() {
-  const resp = await fetch("/api/reports");
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-  db.reports = (data.reports || []).map(toFlowObjFromServer);
-}
-
-  db.reports = []; // reports всегда с сервера.
+  function saveDraftsToLS(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts })); }
 
   let state = {
-    view: 'main',
-    manager: '', restaurant: '', reason: '', comment: '',
-    start: null, end: null, stage: 'start',
-    amount: 0,
-    filter: 'all',
-    analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
-    analyticsTab: 'restaurants',
-    draftId: null,
-    editId: null
+    view:'main',
+    manager:'', restaurant:'', reason:'', comment:'',
+    start:null, end:null, stage:'start',
+    amount:0,
+    filter:'all',
+    analyticsCal:{ month:new Date().getMonth(), year:new Date().getFullYear(), start:null, end:null },
+    analyticsTab:'restaurants',
+    draftId:null,
+    editId:null
   };
 
   let historyStack = ['main'];
 
   function pad2(n){ return String(n).padStart(2,'0'); }
 
-  function getNowObj() {
+  function getNowObj(){
     const d = new Date();
     return { day:d.getDate(), month:d.getMonth(), year:d.getFullYear(), hour:d.getHours(), min:d.getMinutes(), ts:d.getTime() };
   }
 
-  function parseRuDateTime(str) {
-    // "dd.mm.yyyy hh:mm"
-    if (!str || typeof str !== "string") return null;
-    const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
-    if (!m) return null;
-    const dd = Number(m[1]), mm = Number(m[2]), yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
-    const dt = new Date(yy, mm - 1, dd, hh, mi);
-    if (Number.isNaN(dt.getTime())) return null;
-    return { day: dd, month: mm - 1, year: yy, hour: hh, min: mi, ts: dt.getTime() };
-  }
-
-  function formatRu(obj) {
+  function formatRu(obj){
     return `${pad2(obj.day)}.${pad2(obj.month+1)}.${obj.year} ${pad2(obj.hour)}:${pad2(obj.min)}`;
   }
 
-  function normalizeServerReport(r) {
-    // r.start/r.end — строки, created_at — ts.
-    const startObj = parseRuDateTime(r.start) || getNowObj();
-    const endObj = parseRuDateTime(r.end) || startObj;
+  function parseRuDT(s){
+    if (!s || typeof s !== "string") return null;
+    const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+    if (!m) return null;
+    const dd=+m[1], mm=+m[2]-1, yy=+m[3], hh=+m[4], mi=+m[5];
+    const d = new Date(yy, mm, dd, hh, mi);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  }
+
+  function toFlowObjFromServer(row){
+    const sd = parseRuDT(row.start) || new Date(row.created_at || Date.now());
+    const ed = parseRuDT(row.end) || sd;
     return {
-      id: Number(r.id),
-      manager: r.manager || '',
-      restaurant: r.restaurant || '',
-      reason: r.reason || '',
-      comment: r.comment || '',
-      amount: Number(r.amount) || 0,
-      start: startObj,
-      end: endObj,
-      created_at: Number(r.created_at) || startObj.ts
+      id: Number(row.id),
+      manager: row.manager || '',
+      restaurant: row.restaurant || '',
+      reason: row.reason || '',
+      comment: row.comment || '',
+      amount: Number(row.amount) || 0,
+      start: { day: sd.getDate(), month: sd.getMonth(), year: sd.getFullYear(), hour: sd.getHours(), min: sd.getMinutes(), ts: sd.getTime() },
+      end:   { day: ed.getDate(), month: ed.getMonth(), year: ed.getFullYear(), hour: ed.getHours(), min: ed.getMinutes(), ts: ed.getTime() },
+      created_at: Number(row.created_at) || sd.getTime()
     };
   }
 
-  async function apiJson(url, options) {
-    const resp = await fetch(url, options);
+  async function loadReportsFromServer(){
+    const resp = await fetch(`${API}/reports`);
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) {
-      throw new Error(data.error || resp.status || "Ошибка запроса.");
-    }
-    return data;
+    if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    db.reports = (data.reports || []).map(toFlowObjFromServer);
   }
 
-  async function loadReportsFromServer() {
-    const data = await apiJson(`${API}/reports`, { method: "GET" });
-    db.reports = (data.reports || []).map(normalizeServerReport);
-  }
-
-  async function refreshFromServer() {
-    try {
+  async function refreshFromServer(showPopup){
+    try{
       await loadReportsFromServer();
       render();
-      if (tg) tg.showPopup({ title: "Готово.", message: "Данные обновлены с сервера.", buttons: [{ type: "ok" }] });
-    } catch (e) {
-      alert("Не удалось обновить данные: " + (e?.message || e));
+      if (showPopup && tg) tg.showPopup({ title:"Готово.", message:"Данные обновлены с сервера.", buttons:[{type:"ok"}] });
+    }catch(e){
+      alert("Не удалось обновить: " + (e?.message || e));
     }
   }
 
-  function render() {
+  function confirmResetDraftsOnly(){
+    if(confirm("Удалить ВСЕ локальные черновики на этом устройстве?")){
+      db.drafts = [];
+      saveDraftsToLS();
+      render();
+    }
+  }
+
+  // ---------- UI ----------
+  function render(){
     const container = document.getElementById('view-container');
     const footer = document.getElementById('footer-actions');
     const backBtn = document.getElementById('back-btn');
@@ -236,7 +190,7 @@ async function loadReportsFromServer() {
     footer.classList.add('hidden');
     laterBtn.classList.remove('hidden');
 
-    if (state.view === 'main') {
+    if(state.view === 'main'){
       title.innerText = "KFC";
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
@@ -252,7 +206,7 @@ async function loadReportsFromServer() {
 
         ${db.drafts.length ? `
         <div class="mb-8">
-          <p class="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-3 px-1">Черновики</p>
+          <p class="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-3 px-1">Черновики (только на этом устройстве)</p>
           <div class="space-y-3">
             ${db.drafts.map(d => `
               <div class="relative group">
@@ -276,33 +230,33 @@ async function loadReportsFromServer() {
 
         <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
           <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500"><i data-lucide="history"></i></div>
-          <span class="font-bold text-xs uppercase tracking-widest text-gray-400">История записей</span>
+          <span class="font-bold text-xs uppercase tracking-widest text-gray-400">История инцидентов</span>
         </button>
       `;
     }
 
-    else if (state.view === 'managers') {
-      title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
+    else if(state.view === 'managers'){
+      title.innerText = state.editId ? "Менеджер (ред.)" : "Менеджер";
       Object.keys(dataTU).sort().forEach(m => {
         container.innerHTML += `<button onclick="state.manager='${m}';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
       });
     }
 
-    else if (state.view === 'restaurants') {
+    else if(state.view === 'restaurants'){
       title.innerText = "Ресторан";
       (dataTU[state.manager] || []).forEach(r => {
         container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
 
-    else if (state.view === 'reasons') {
+    else if(state.view === 'reasons'){
       title.innerText = "Причина";
       ["Внешние факторы","Отсутствие продукта","Персонал","Внутренние факторы"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
 
-    else if (state.view === 'comment') {
+    else if(state.view === 'comment'){
       title.innerText = "Детали";
       container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
       footer.classList.remove('hidden');
@@ -310,7 +264,7 @@ async function loadReportsFromServer() {
       document.getElementById('primary-btn').onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
     }
 
-    else if (state.view === 'calendar') {
+    else if(state.view === 'calendar'){
       const isStart = state.stage === 'start';
       const cur = isStart ? state.start : state.end;
       title.innerText = isStart ? "Начало" : "Конец";
@@ -367,7 +321,7 @@ async function loadReportsFromServer() {
       };
     }
 
-    else if (state.view === 'sum') {
+    else if(state.view === 'sum'){
       title.innerText = "Сумма";
       container.innerHTML = `
         <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
@@ -390,14 +344,10 @@ async function loadReportsFromServer() {
       setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
     }
 
-    else if (state.view === 'analytics_period') {
+    else if(state.view === 'analytics_period'){
       title.innerText = "Аналитика";
-      [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}]
-      .forEach(opt => {
-        const handler = (opt.id === 'custom')
-          ? "navigate('analytics_custom')"
-          : `state.filter='${opt.id}';navigate('analytics_view')`;
-
+      [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}].forEach(opt => {
+        const handler = (opt.id==='custom') ? "navigate('analytics_custom')" : `state.filter='${opt.id}';navigate('analytics_view')`;
         container.innerHTML += `
           <button onclick="${handler}" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
             <span>${opt.n}</span>
@@ -407,7 +357,7 @@ async function loadReportsFromServer() {
       });
     }
 
-    else if (state.view === 'analytics_custom') {
+    else if(state.view === 'analytics_custom'){
       title.innerText = "Период";
       const cal = state.analyticsCal;
       const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
@@ -434,7 +384,7 @@ async function loadReportsFromServer() {
         </div>
       `;
 
-      if (cal.start && cal.end) {
+      if(cal.start && cal.end){
         footer.classList.remove('hidden');
         laterBtn.classList.add('hidden');
         document.getElementById('primary-btn').innerText = "Показать";
@@ -442,10 +392,10 @@ async function loadReportsFromServer() {
       }
     }
 
-    else if (state.view === 'analytics_view') {
+    else if(state.view === 'analytics_view'){
       title.innerText = "Итоги";
       const filtered = filterAnalytics(db.reports);
-      const totalSum = filtered.reduce((a, b) => a + b.amount, 0);
+      const totalSum = filtered.reduce((a,b) => a + (Number(b.amount)||0), 0);
 
       container.innerHTML = `
         <div class="ios-card p-6 mb-4 text-center bg-gradient-to-b from-white/5 to-transparent">
@@ -468,231 +418,225 @@ async function loadReportsFromServer() {
       `;
     }
 
-    eelse if (state.view === 'history') {
-  title.innerText = "История";
+    else if(state.view === 'history'){
+      title.innerText = "История";
+      if(!db.reports.length){
+        container.innerHTML = `<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>`;
+      }else{
+        container.innerHTML = `<div class="space-y-3 pb-20">
+          ${db.reports.map(r => `
+            <div class="ios-card p-4">
+              <div class="flex justify-between mb-1">
+                <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${escapeHtml(r.manager)}</span>
+                <span class="text-sm font-black text-red-500">${Number(r.amount||0).toLocaleString()} ₸</span>
+              </div>
+              <p class="text-xs font-bold truncate">${escapeHtml(((r.restaurant||'').includes(' — ')) ? r.restaurant.split(' — ')[1] : (r.restaurant||''))}</p>
+              <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">
+                ${pad2(r.start.day)}.${pad2(r.start.month+1)} ${pad2(r.start.hour)}:${pad2(r.start.min)}
+                —
+                ${pad2(r.end.day)}.${pad2(r.end.month+1)} ${pad2(r.end.hour)}:${pad2(r.end.min)}
+              </p>
 
-  if (!db.reports.length) {
-    container.innerHTML = `<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>`;
-  } else {
-    container.innerHTML = `<div class="space-y-3 pb-20">
-      ${db.reports.map(r => `
-        <div class="ios-card p-4">
-          <div class="flex justify-between mb-1">
-            <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${r.manager}</span>
-            <span class="text-sm font-black text-red-500">${Number(r.amount).toLocaleString()} ₸</span>
-          </div>
-          <p class="text-xs font-bold truncate">${(r.restaurant || '').split(' — ')[1] || r.restaurant}</p>
-          <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">
-            ${r.start.day}.${r.start.month+1} ${String(r.start.hour).padStart(2,'0')}:${String(r.start.min).padStart(2,'0')}
-            —
-            ${r.end.day}.${r.end.month+1} ${String(r.end.hour).padStart(2,'0')}:${String(r.end.min).padStart(2,'0')}
-          </p>
-
-          <div class="flex gap-3 mt-4">
-            <button onclick="editReport(${r.id})" class="flex-1 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white active:scale-95">
-              Редактировать
-            </button>
-            <button onclick="deleteReport(${r.id})" class="px-5 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-red-500/10 text-[#E4002B] active:scale-95">
-              Удалить
-            </button>
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
-  }
-}
-
+              <div class="flex gap-3 mt-4">
+                <button onclick="editReport(${r.id})" class="flex-1 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white active:scale-95">
+                  Редактировать
+                </button>
+                <button onclick="deleteReport(${r.id})" class="px-5 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-red-500/10 text-[#E4002B] active:scale-95">
+                  Удалить
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>`;
+      }
+    }
 
     lucide.createIcons();
   }
 
-  function renderRestList(reports, total) {
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderRestList(reports, total){
     const grouped = {};
-    reports.forEach(r => { grouped[r.restaurant] = (grouped[r.restaurant] || 0) + r.amount; });
-    return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([name, sum]) => {
-      const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
+    reports.forEach(r => { grouped[r.restaurant] = (grouped[r.restaurant] || 0) + Number(r.amount||0); });
+    return Object.entries(grouped).sort((a,b) => b[1]-a[1]).map(([name,sum]) => {
+      const perc = total>0 ? ((sum/total)*100).toFixed(1) : 0;
+      const title = (name||'').includes(' — ') ? name.split(' — ')[1] : (name||'');
+      const code = (name||'').includes(' — ') ? name.split(' — ')[0] : '';
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
-            <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
-            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
+            <span class="text-xs font-bold truncate">${escapeHtml(title)}</span>
+            <span class="text-[9px] text-gray-500 font-bold uppercase">${escapeHtml(code)}</span>
           </div>
           <div class="text-right flex flex-col items-end">
-            <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
+            <span class="text-sm font-black">${Number(sum).toLocaleString()} ₸</span>
             <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
-    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>';
   }
 
-  function renderReasonList(reports, total) {
+  function renderReasonList(reports, total){
     const grouped = {};
-    reports.forEach(r => { grouped[r.reason] = (grouped[r.reason] || 0) + r.amount; });
-    return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([reason, sum]) => {
-      const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
+    reports.forEach(r => { grouped[r.reason] = (grouped[r.reason] || 0) + Number(r.amount||0); });
+    return Object.entries(grouped).sort((a,b) => b[1]-a[1]).map(([reason,sum]) => {
+      const perc = total>0 ? ((sum/total)*100).toFixed(1) : 0;
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-center mb-1">
-          <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
+          <span class="text-xs font-bold uppercase tracking-tight">${escapeHtml(reason)}</span>
           <div class="text-right flex flex-col items-end">
-            <span class="text-sm font-black text-red-500">${sum.toLocaleString()} ₸</span>
+            <span class="text-sm font-black text-red-500">${Number(sum).toLocaleString()} ₸</span>
             <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
-    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>';
   }
 
-  function saveDraft() {
-    if (state.view === 'calendar') {
+  // ---------- Drafts (local only) ----------
+  function saveDraft(){
+    // сохранить текущие данные во время ввода
+    if(state.view === 'calendar'){
       const v = getWheels();
-      if (state.stage === 'start') { state.start.hour=v.h; state.start.min=v.m; }
+      if(state.stage==='start'){ state.start.hour=v.h; state.start.min=v.m; }
       else { state.end.hour=v.h; state.end.min=v.m; }
     }
-    if (state.view === 'comment') state.comment = document.getElementById('comm').value;
-    if (state.view === 'sum') state.amount = parseInt(document.getElementById('sum-input').value) || 0;
+    if(state.view === 'comment'){
+      const el = document.getElementById('comm');
+      if(el) state.comment = el.value;
+    }
+    if(state.view === 'sum'){
+      const el = document.getElementById('sum-input');
+      if(el) state.amount = parseInt(el.value)||0;
+    }
 
-    if (!state.draftId) state.draftId = 'd_' + Date.now();
+    if(!state.draftId) state.draftId = 'd_' + Date.now();
     const idx = db.drafts.findIndex(d => d.draftId === state.draftId);
-    if (idx !== -1) db.drafts[idx] = JSON.parse(JSON.stringify(state));
+    if(idx !== -1) db.drafts[idx] = JSON.parse(JSON.stringify(state));
     else db.drafts.push(JSON.parse(JSON.stringify(state)));
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
+    saveDraftsToLS();
     state.view='main'; historyStack=['main']; render();
   }
 
-  function resumeDraft(id) {
-    const d = db.drafts.find(it => it.draftId === id);
-    if (d) {
-      state = JSON.parse(JSON.stringify(d));
-      state.view='calendar';
-      state.stage='end';
-      if (!state.end) state.end = JSON.parse(JSON.stringify(state.start));
-      historyStack=['main','calendar'];
-      render();
-    }
+  function resumeDraft(id){
+    const d = db.drafts.find(x => x.draftId === id);
+    if(!d) return;
+    state = JSON.parse(JSON.stringify(d));
+    // после возобновления логично вести дальше по сценарию
+    state.view = state.view || 'calendar';
+    if(!state.start) state.start = getNowObj();
+    if(!state.end) state.end = JSON.parse(JSON.stringify(state.start));
+    historyStack = ['main', state.view];
+    render();
   }
 
-  function deleteDraft(id) {
+  function deleteDraft(id){
     db.drafts = db.drafts.filter(d => d.draftId !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
+    saveDraftsToLS();
     render();
   }
 
-  // ✅ Excel через сервер. Работает на iPhone/Telegram WebView.
-  function exportExcel() {
-  const tg = window.Telegram?.WebApp;
-  const url = `${window.location.origin}/api/export.xlsx`;
+  // ---------- Create/Update/Delete (server) ----------
+  async function saveReport(){
+    const val = parseInt(document.getElementById('sum-input')?.value || "0", 10) || 0;
+    if(val <= 0){ alert("Укажи сумму больше нуля."); return; }
+    state.amount = val;
 
-  // В Telegram iOS лучше открывать ссылку через tg.openLink
-  if (tg && typeof tg.openLink === "function") {
-    tg.openLink(url);
-    return;
+    const payload = {
+      manager: state.manager,
+      restaurant: state.restaurant,
+      reason: state.reason,
+      amount: state.amount,
+      start: formatRu(state.start),
+      end: formatRu(state.end),
+      comment: state.comment || "-"
+    };
+
+    try{
+      const isEdit = !!state.editId;
+      const url = isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`;
+      const method = isEdit ? "PUT" : "POST";
+
+      const resp = await fetch(url, { method, headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+      const data = await resp.json().catch(() => ({}));
+      if(!resp.ok || !data.ok){ alert(`Ошибка сохранения: ${data.error || resp.status}`); return; }
+
+      // после сохранения — перезагрузка с сервера (истина одна)
+      await loadReportsFromServer();
+
+      // если был черновик — удалить локально
+      if(state.draftId){
+        db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
+        saveDraftsToLS();
+      }
+
+      state.view='main'; historyStack=['main']; state.editId=null; render();
+    }catch(e){
+      alert("Ошибка: " + (e?.message || e));
+    }
   }
 
-  // обычный браузер
-  window.location.href = url;
-}
+  function editReport(id){
+    const r = db.reports.find(x => x.id === id);
+    if(!r) return;
 
+    state = {
+      view:'comment',
+      manager:r.manager,
+      restaurant:r.restaurant,
+      reason:r.reason,
+      comment:r.comment || '',
+      start: JSON.parse(JSON.stringify(r.start)),
+      end: JSON.parse(JSON.stringify(r.end)),
+      stage:'start',
+      amount:r.amount || 0,
+      filter: state.filter,
+      analyticsCal: state.analyticsCal,
+      analyticsTab: state.analyticsTab,
+      draftId:null,
+      editId:id
+    };
 
-  async function saveReport() {
-  const val = parseInt(document.getElementById('sum-input').value) || 0;
-  if (val <= 0) return;
-
-  state.amount = val;
-
-  const startStr = `${state.start.day}.${state.start.month+1}.${state.start.year} ${String(state.start.hour).padStart(2,'0')}:${String(state.start.min).padStart(2,'0')}`;
-  const endStr   = `${state.end.day}.${state.end.month+1}.${state.end.year} ${String(state.end.hour).padStart(2,'0')}:${String(state.end.min).padStart(2,'0')}`;
-
-  const payload = {
-    manager: state.manager,
-    restaurant: state.restaurant,
-    reason: state.reason,
-    amount: state.amount,
-    start: startStr,
-    end: endStr,
-    comment: state.comment || '-'
-  };
-
-  try {
-    const isEdit = !!state.editId;
-
-    const resp = await fetch(isEdit ? `/api/reports/${state.editId}` : "/api/reports", {
-      method: isEdit ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) {
-      alert(`Ошибка сохранения: ${data.error || resp.status}`);
-      return;
-    }
-
-    // обновляем список с сервера (самый надёжный способ)
-    await loadReportsFromServer();
-
-    // черновик удалить локально, если был
-    if (state.draftId) {
-      db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
-      saveDraftsToLS();
-    }
-
-    state.view='main'; historyStack=['main']; render();
-  } catch (e) {
-    alert(`Ошибка: ${e?.message || 'unknown'}`);
-  }
-}
-
-
-function editReport(id) {
-  const r = db.reports.find(x => x.id === id);
-  if (!r) return;
-
-  state = {
-    view:'comment',
-    manager: r.manager,
-    restaurant: r.restaurant,
-    reason: r.reason,
-    comment: r.comment || '',
-    start: JSON.parse(JSON.stringify(r.start)),
-    end: JSON.parse(JSON.stringify(r.end)),
-    stage:'start',
-    amount: r.amount || 0,
-
-    filter: state.filter,
-    analyticsCal: state.analyticsCal,
-    analyticsTab: state.analyticsTab || 'restaurants',
-
-    draftId: null,
-    editId: id
-  };
-
-  historyStack = ['main','history','comment'];
-  render();
-}
-
-async function deleteReport(id) {
-  if (!confirm("Удалить этот инцидент?")) return;
-
-  try {
-    const resp = await fetch(`/api/reports/${id}`, { method: "DELETE" });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) {
-      alert(`Ошибка удаления: ${data.error || resp.status}`);
-      return;
-    }
-    await loadReportsFromServer();
+    historyStack = ['main','history','comment'];
     render();
-  } catch (e) {
-    alert("Ошибка: " + (e?.message || e));
   }
-}
 
+  async function deleteReport(id){
+    if(!confirm("Удалить этот инцидент?")) return;
+    try{
+      const resp = await fetch(`${API}/reports/${id}`, { method:"DELETE" });
+      const data = await resp.json().catch(() => ({}));
+      if(!resp.ok || !data.ok){ alert(`Ошибка удаления: ${data.error || resp.status}`); return; }
 
-  function startFlow() {
+      await loadReportsFromServer();
+      render();
+    }catch(e){
+      alert("Ошибка: " + (e?.message || e));
+    }
+  }
+
+  // ---------- Excel ----------
+  function exportExcelServer(){
+    const url = `${window.location.origin}${API}/export.xlsx`;
+
+    // Telegram iOS: лучше tg.openLink
+    if(tg && typeof tg.openLink === "function"){
+      tg.openLink(url);
+      return;
+    }
+    // обычный браузер
+    window.location.href = url;
+  }
+
+  // ---------- Flow navigation ----------
+  function startFlow(){
     state = {
       view:'managers',
       manager:'', restaurant:'', reason:'', comment:'',
@@ -702,9 +646,9 @@ async function deleteReport(id) {
       amount:0,
       filter: state.filter,
       analyticsCal: state.analyticsCal,
-      analyticsTab: 'restaurants',
-      draftId: null,
-      editId: null
+      analyticsTab: state.analyticsTab || 'restaurants',
+      draftId:null,
+      editId:null
     };
     navigate('managers');
   }
@@ -712,12 +656,12 @@ async function deleteReport(id) {
   function navigate(v){ historyStack.push(v); state.view=v; render(); }
   function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
   function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
-  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
+  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v,10); render(); }
 
   function setAnalyticsDate(ts){
     if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
       state.analyticsCal.start=ts; state.analyticsCal.end=null;
-    } else {
+    }else{
       if(ts < state.analyticsCal.start){ state.analyticsCal.end=state.analyticsCal.start; state.analyticsCal.start=ts; }
       else state.analyticsCal.end=ts;
     }
@@ -726,35 +670,35 @@ async function deleteReport(id) {
 
   function changeCalMonth(s){
     state.analyticsCal.month += s;
-    if(state.analyticsCal.month>11){state.analyticsCal.month=0;state.analyticsCal.year++;}
-    if(state.analyticsCal.month<0){state.analyticsCal.month=11;state.analyticsCal.year--;}
+    if(state.analyticsCal.month>11){ state.analyticsCal.month=0; state.analyticsCal.year++; }
+    if(state.analyticsCal.month<0){ state.analyticsCal.month=11; state.analyticsCal.year--; }
     render();
   }
 
   function scaleSumInput(input){
-    const val=input.value;
+    const val = input.value || '';
     if(val.length>7) input.style.fontSize='32px';
     else if(val.length>5) input.style.fontSize='44px';
     else input.style.fontSize='60px';
   }
 
   function filterAnalytics(reports){
-    const now=new Date();
-    const startOfToday=new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
     return reports.filter(r => {
       const ts = r.start?.ts || r.created_at || 0;
 
       if(state.filter==='today') return ts >= startOfToday;
 
-      if(state.filter==='week') {
-        const dow = (now.getDay() || 7) - 1; // 0..6
+      if(state.filter==='week'){
+        const dow = (now.getDay() || 7) - 1;
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
 
-      if(state.filter==='custom') {
-        if (!state.analyticsCal.start || !state.analyticsCal.end) return true;
+      if(state.filter==='custom'){
+        if(!state.analyticsCal.start || !state.analyticsCal.end) return true;
         return ts >= state.analyticsCal.start && ts <= (state.analyticsCal.end + 86400000);
       }
 
@@ -762,19 +706,24 @@ async function deleteReport(id) {
     });
   }
 
+  // ---------- Wheels ----------
   function initWheels(t){
     setTimeout(() => {
       const h=document.getElementById('h-w'), m=document.getElementById('m-w');
       if(!h || !m) return;
+
       h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
       m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
-      h.scrollTop=t.hour*52; m.scrollTop=t.min*52;
+
+      h.scrollTop=(t.hour||0)*52;
+      m.scrollTop=(t.min||0)*52;
 
       const sync=(el)=>{
         const idx=Math.round(el.scrollTop/52);
         el.querySelectorAll('.wheel-item').forEach((it,i)=>it.classList.toggle('active', i===idx));
       };
-      h.onscroll=()=>sync(h); m.onscroll=()=>sync(m);
+      h.onscroll=()=>sync(h);
+      m.onscroll=()=>sync(m);
       sync(h); sync(m);
     }, 10);
   }
@@ -783,49 +732,17 @@ async function deleteReport(id) {
     const h=document.getElementById('h-w'), m=document.getElementById('m-w');
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
-  
-// ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
 
-function parseDateStr(s) {
-  if (!s) return getNow();
-  const [datePart, timePart] = String(s).trim().split(" ");
-  const [dd, mm, yyyy] = datePart.split(".").map(Number);
-  const [hh, mi] = (timePart || "00:00").split(":").map(Number);
-  const ts = new Date(yyyy, mm - 1, dd, hh, mi).getTime();
-  return { day: dd, month: mm - 1, year: yyyy, hour: hh, min: mi, ts };
-}
-
-async function loadReportsFromServer() {
-  const resp = await fetch("/api/reports");
-  const data = await resp.json();
-
-  if (!resp.ok || !data.ok) {
-    throw new Error(data.error || "Ошибка загрузки отчетов");
-  }
-
-  db.reports = (data.reports || []).map(r => ({
-    id: r.id,
-    manager: r.manager,
-    restaurant: r.restaurant,
-    reason: r.reason,
-    comment: r.comment || "",
-    amount: Number(r.amount) || 0,
-    start: parseDateStr(r.start),
-    end: parseDateStr(r.end),
-    draftId: null
-  }));
-}
- 
+  // ---------- Start ----------
   window.addEventListener('load', async () => {
-  try {
-    await loadReportsFromServer(); // ⬅️ ВАЖНО
-    render();
-  } catch (e) {
-    alert("Ошибка загрузки данных: " + (e?.message || e));
-    render(); // интерфейс всё равно покажем
-  }
-});
-
+    try{
+      await loadReportsFromServer();
+    }catch(e){
+      alert("Ошибка загрузки данных с сервера: " + (e?.message || e));
+    }finally{
+      render();
+    }
+  });
 </script>
 </body>
 </html>
