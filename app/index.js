@@ -1,3 +1,4 @@
+// app/index.js
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -105,19 +106,19 @@ app.post("/api/reports", async (req, res) => {
 
     const row = await get(`SELECT * FROM reports WHERE id = ?`, [r.lastID]);
 
-    // Отправка в Telegram (опционально)
+    // Telegram notify (optional)
     const BOT_TOKEN = process.env.BOT_TOKEN;
-    const TG_CHAT_ID = process.env.CHAT_ID;
+    const TG_CHAT_ID = process.env.TG_CHAT_ID;
     if (BOT_TOKEN && TG_CHAT_ID) {
       const text =
         `🚨 ОТЧЕТ ПО ПОТЕРЯМ\n\n` +
-        `👤 Менеджер: ${row.manager}\n` +
+        `👤 ТУ: ${row.manager}\n` +
         `🏢 Ресторан: ${row.restaurant}\n` +
         `⚠️ Причина: ${row.reason}\n` +
         `💰 Сумма: ${Number(row.amount).toLocaleString()} ₸\n\n` +
         `🕒 Начало: ${row.start || "-"}\n` +
         `🕒 Конец: ${row.end || "-"}\n\n` +
-        `💬 Детали: ${row.comment || "-"}`;
+        `💬 Комментарий: ${row.comment || "-"}`;
 
       try {
         const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -126,9 +127,7 @@ app.post("/api/reports", async (req, res) => {
           body: JSON.stringify({ chat_id: TG_CHAT_ID, text })
         });
         await tgResp.json().catch(() => ({}));
-      } catch (_) {
-        // не валим создание отчета из-за телеги
-      }
+      } catch (_) {}
     }
 
     res.json({ ok: true, report: row });
@@ -192,35 +191,73 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel (server-side) — работает и на iPhone в Telegram
+// export excel (server-side) — нужный порядок колонок + ₸ + длительность
 app.get("/api/export.xlsx", async (req, res) => {
   try {
     const rows = await all(`SELECT * FROM reports ORDER BY created_at DESC`);
 
-    const data = rows.map((r) => ({
-      "ID": r.id,
-      "ТУ": r.manager,
-      "Ресторан": r.restaurant,
-      "Причина": r.reason,
-      "Сумма потерь (₸)": Number(r.amount),
-      "Начало": r.start || "",
-      "Конец": r.end || "",
-      "Комментарий": r.comment || "",
-      "Создано (ts)": r.created_at
-    }));
+    function parseRuDT(s) {
+      // "07.01.2026 10:00"
+      if (!s || typeof s !== "string") return null;
+      const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+      if (!m) return null;
+      const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
+      const d = new Date(yy, mm, dd, hh, mi);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    const data = rows.map((r) => {
+      const startD = parseRuDT(r.start);
+      const endD = parseRuDT(r.end);
+      const dur =
+        startD && endD ? Number(((endD.getTime() - startD.getTime()) / (1000 * 60 * 60)).toFixed(2)) : "";
+
+      return {
+        "ТУ": r.manager,
+        "Ресторан": r.restaurant,
+        "Причина": r.reason,
+        "Комментарий": r.comment || "",
+        "Начало инцидента": r.start || "",
+        "Конец инцидента": r.end || "",
+        "Длительность (часы)": dur,
+        "Сумма потерь (₸)": Number(r.amount) || 0
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
 
-    // формат суммы в ₸
+    // Формат суммы: ₸ (последняя колонка)
     const range = XLSX.utils.decode_range(ws["!ref"]);
-    // колонка "Сумма потерь (₸)" — индекс 4 (0-based)
+    const moneyColIndex = 7; // 8-я колонка
     for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      const cell = XLSX.utils.encode_cell({ c: 4, r: R });
+      const cell = XLSX.utils.encode_cell({ c: moneyColIndex, r: R });
       if (ws[cell]) {
         ws[cell].t = "n";
         ws[cell].z = '#,##0 "₸"';
       }
     }
+
+    // Формат длительности: 0.00
+    const durColIndex = 6; // 7-я колонка
+    for (let R = range.s.r + 1; R <= range.e.r; R++) {
+      const cell = XLSX.utils.encode_cell({ c: durColIndex, r: R });
+      if (ws[cell] && ws[cell].v !== "") {
+        ws[cell].t = "n";
+        ws[cell].z = "0.00";
+      }
+    }
+
+    // ширины колонок
+    ws["!cols"] = [
+      { wch: 22 }, // ТУ
+      { wch: 28 }, // Ресторан
+      { wch: 18 }, // Причина
+      { wch: 40 }, // Комментарий
+      { wch: 20 }, // Начало
+      { wch: 20 }, // Конец
+      { wch: 18 }, // Длительность
+      { wch: 18 }  // Сумма
+    ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Loss");
