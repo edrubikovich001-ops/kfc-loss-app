@@ -1,9 +1,5 @@
 {
-  "manager": "TEST MANAGER",
-  "restaurant": "12714 — KFC Essentai Mall",
-  "reason": "Проверка",
-  "amount": 12345,
-  "start": "07.01.2026 10:00",
-  "end": "07.01.2026 11:00",
-  "comment": "Тест с ReqBin"
+  "scripts": {
+    "start": "node server/index.js"
+  }
 }
