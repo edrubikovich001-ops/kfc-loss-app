@@ -1,9 +1,11 @@
-// app/index.js
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import sqlite3 from "sqlite3";
 import XLSX from "xlsx";
+import crypto from "crypto";
+import pg from "pg";
+
+const { Pool } = pg;
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -15,69 +17,91 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "..", "public");
 app.use(express.static(publicDir));
 
-// --- DB (SQLite) ---
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "data.sqlite");
-const db = new sqlite3.Database(DB_PATH);
+/**
+ * ENV
+ * DATABASE_URL  - строка подключения Supabase Postgres (лучше pooled)
+ * BOT_TOKEN     - телеграм бот токен (опционально)
+ * TG_CHAT_ID    - chat_id куда слать (опционально)
+ */
+const DATABASE_URL = process.env.DATABASE_URL;
 
-db.serialize(() => {
-  db.run(`
+if (!DATABASE_URL) {
+  console.error("FATAL: DATABASE_URL is missing. Set it in Render Environment.");
+}
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false }
+});
+
+// --- helpers ---
+async function q(text, params) {
+  const r = await pool.query(text, params);
+  return r;
+}
+
+function parseRuDT(s) {
+  // "07.01.2026 10:00"
+  if (!s || typeof s !== "string") return null;
+  const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
+  const d = new Date(yy, mm, dd, hh, mi);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function hoursDiff(startStr, endStr) {
+  const a = parseRuDT(startStr);
+  const b = parseRuDT(endStr);
+  if (!a || !b) return "";
+  const diff = (b.getTime() - a.getTime()) / (1000 * 60 * 60);
+  return Math.round(diff * 100) / 100; // 2 знака
+}
+
+async function ensureSchema() {
+  await q(`
     CREATE TABLE IF NOT EXISTS reports (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id BIGSERIAL PRIMARY KEY,
+      request_id TEXT UNIQUE,
       manager TEXT NOT NULL,
       restaurant TEXT NOT NULL,
       reason TEXT NOT NULL,
-      amount INTEGER NOT NULL,
-      start TEXT,
-      end TEXT,
       comment TEXT,
-      created_at INTEGER NOT NULL
-    )
+      start TEXT,
+      "end" TEXT,
+      amount INTEGER NOT NULL,
+      created_at BIGINT NOT NULL
+    );
   `);
-});
+}
 
-// helpers
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
-}
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
-}
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-}
+await ensureSchema();
 
 // health
-app.get("/api/health", (req, res) => res.json({ ok: true }));
+app.get("/api/health", async (req, res) => {
+  try {
+    await q("SELECT 1 as ok");
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || "db error" });
+  }
+});
 
 // list
 app.get("/api/reports", async (req, res) => {
   try {
-    const rows = await all(`SELECT * FROM reports ORDER BY created_at DESC`);
-    res.json({ ok: true, reports: rows });
+    const r = await q(`SELECT * FROM reports ORDER BY created_at DESC`);
+    res.json({ ok: true, reports: r.rows });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "unknown" });
   }
 });
 
-// create
+// create (с защитой от дубля по request_id)
 app.post("/api/reports", async (req, res) => {
   try {
-    const { manager, restaurant, reason, amount, start, end, comment } = req.body || {};
+    const { manager, restaurant, reason, amount, start, end, comment, request_id } = req.body || {};
 
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
@@ -88,31 +112,37 @@ app.post("/api/reports", async (req, res) => {
     }
 
     const created_at = Date.now();
+    const rid = (request_id && String(request_id).trim()) || crypto.randomUUID();
 
-    const r = await run(
-      `INSERT INTO reports (manager, restaurant, reason, amount, start, end, comment, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    // INSERT ... ON CONFLICT DO NOTHING → если дубль, просто вернём существующую запись
+    await q(
+      `
+      INSERT INTO reports (request_id, manager, restaurant, reason, comment, start, "end", amount, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ON CONFLICT (request_id) DO NOTHING
+      `,
       [
+        rid,
         String(manager).trim(),
         String(restaurant).trim(),
         String(reason).trim(),
-        Math.round(nAmount),
+        comment ? String(comment) : "",
         start ? String(start) : "",
         end ? String(end) : "",
-        comment ? String(comment) : "",
+        Math.round(nAmount),
         created_at
       ]
     );
 
-    const row = await get(`SELECT * FROM reports WHERE id = ?`, [r.lastID]);
+    const row = (await q(`SELECT * FROM reports WHERE request_id=$1`, [rid])).rows[0];
 
-    // Telegram notify (optional)
+    // Telegram (опционально)
     const BOT_TOKEN = process.env.BOT_TOKEN;
     const TG_CHAT_ID = process.env.TG_CHAT_ID;
-    if (BOT_TOKEN && TG_CHAT_ID) {
+    if (BOT_TOKEN && TG_CHAT_ID && row) {
       const text =
         `🚨 ОТЧЕТ ПО ПОТЕРЯМ\n\n` +
-        `👤 ТУ: ${row.manager}\n` +
+        `👤 Менеджер: ${row.manager}\n` +
         `🏢 Ресторан: ${row.restaurant}\n` +
         `⚠️ Причина: ${row.reason}\n` +
         `💰 Сумма: ${Number(row.amount).toLocaleString()} ₸\n\n` +
@@ -142,23 +172,26 @@ app.put("/api/reports/:id", async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "Bad id." });
 
-    const existing = await get(`SELECT * FROM reports WHERE id = ?`, [id]);
+    const existing = (await q(`SELECT * FROM reports WHERE id=$1`, [id])).rows[0];
     if (!existing) return res.status(404).json({ ok: false, error: "Not found." });
 
     const { manager, restaurant, reason, amount, start, end, comment } = req.body || {};
 
-    const nAmount = Number(amount);
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
     }
+    const nAmount = Number(amount);
     if (!Number.isFinite(nAmount) || nAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
     }
 
-    await run(
-      `UPDATE reports
-       SET manager=?, restaurant=?, reason=?, amount=?, start=?, end=?, comment=?
-       WHERE id=?`,
+    const r = await q(
+      `
+      UPDATE reports
+      SET manager=$1, restaurant=$2, reason=$3, amount=$4, start=$5, "end"=$6, comment=$7
+      WHERE id=$8
+      RETURNING *
+      `,
       [
         String(manager).trim(),
         String(restaurant).trim(),
@@ -171,8 +204,7 @@ app.put("/api/reports/:id", async (req, res) => {
       ]
     );
 
-    const row = await get(`SELECT * FROM reports WHERE id = ?`, [id]);
-    res.json({ ok: true, report: row });
+    res.json({ ok: true, report: r.rows[0] });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "unknown" });
   }
@@ -184,78 +216,52 @@ app.delete("/api/reports/:id", async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "Bad id." });
 
-    await run(`DELETE FROM reports WHERE id=?`, [id]);
+    await q(`DELETE FROM reports WHERE id=$1`, [id]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "unknown" });
   }
 });
 
-// export excel (server-side) — нужный порядок колонок + ₸ + длительность
+// export excel (серверный) — с нужными колонками
 app.get("/api/export.xlsx", async (req, res) => {
   try {
-    const rows = await all(`SELECT * FROM reports ORDER BY created_at DESC`);
+    const rows = (await q(`SELECT * FROM reports ORDER BY created_at DESC`)).rows;
 
-    function parseRuDT(s) {
-      // "07.01.2026 10:00"
-      if (!s || typeof s !== "string") return null;
-      const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
-      if (!m) return null;
-      const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
-      const d = new Date(yy, mm, dd, hh, mi);
-      return Number.isNaN(d.getTime()) ? null : d;
-    }
-
-    const data = rows.map((r) => {
-      const startD = parseRuDT(r.start);
-      const endD = parseRuDT(r.end);
-      const dur =
-        startD && endD ? Number(((endD.getTime() - startD.getTime()) / (1000 * 60 * 60)).toFixed(2)) : "";
-
-      return {
-        "ТУ": r.manager,
-        "Ресторан": r.restaurant,
-        "Причина": r.reason,
-        "Комментарий": r.comment || "",
-        "Начало инцидента": r.start || "",
-        "Конец инцидента": r.end || "",
-        "Длительность (часы)": dur,
-        "Сумма потерь (₸)": Number(r.amount) || 0
-      };
-    });
+    const data = rows.map((r) => ({
+      "ТУ": r.manager,
+      "Ресторан": r.restaurant,
+      "Причина": r.reason,
+      "Комментарий": r.comment || "",
+      "Начало инцидента": r.start || "",
+      "Конец инцидента": r.end || "",
+      "Длительность (ч)": hoursDiff(r.start, r.end),
+      "Сумма потерь (₸)": Number(r.amount) || 0
+    }));
 
     const ws = XLSX.utils.json_to_sheet(data);
 
-    // Формат суммы: ₸ (последняя колонка)
-    const range = XLSX.utils.decode_range(ws["!ref"]);
-    const moneyColIndex = 7; // 8-я колонка
-    for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      const cell = XLSX.utils.encode_cell({ c: moneyColIndex, r: R });
-      if (ws[cell]) {
-        ws[cell].t = "n";
-        ws[cell].z = '#,##0 "₸"';
+    // Формат суммы в ₸: последняя колонка (индекс 7)
+    if (ws["!ref"]) {
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+      for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        const cell = XLSX.utils.encode_cell({ c: 7, r: R });
+        if (ws[cell]) {
+          ws[cell].t = "n";
+          ws[cell].z = '#,##0 "₸"';
+        }
       }
     }
 
-    // Формат длительности: 0.00
-    const durColIndex = 6; // 7-я колонка
-    for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      const cell = XLSX.utils.encode_cell({ c: durColIndex, r: R });
-      if (ws[cell] && ws[cell].v !== "") {
-        ws[cell].t = "n";
-        ws[cell].z = "0.00";
-      }
-    }
-
-    // ширины колонок
+    // Чуть “красоты”: ширины колонок
     ws["!cols"] = [
       { wch: 22 }, // ТУ
       { wch: 28 }, // Ресторан
-      { wch: 18 }, // Причина
+      { wch: 22 }, // Причина
       { wch: 40 }, // Комментарий
       { wch: 20 }, // Начало
       { wch: 20 }, // Конец
-      { wch: 18 }, // Длительность
+      { wch: 14 }, // Длительность
       { wch: 18 }  // Сумма
     ];
 
@@ -279,4 +285,4 @@ app.get(/^\/(?!api).*/, (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Running on ${PORT}, DB=${DB_PATH}`));
+app.listen(PORT, () => console.log(`Running on ${PORT}`));
