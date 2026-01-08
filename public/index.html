@@ -783,16 +783,49 @@ async function deleteReport(id) {
     const h=document.getElementById('h-w'), m=document.getElementById('m-w');
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
+  
+// ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
 
+function parseDateStr(s) {
+  if (!s) return getNow();
+  const [datePart, timePart] = String(s).trim().split(" ");
+  const [dd, mm, yyyy] = datePart.split(".").map(Number);
+  const [hh, mi] = (timePart || "00:00").split(":").map(Number);
+  const ts = new Date(yyyy, mm - 1, dd, hh, mi).getTime();
+  return { day: dd, month: mm - 1, year: yyyy, hour: hh, min: mi, ts };
+}
+
+async function loadReportsFromServer() {
+  const resp = await fetch("/api/reports");
+  const data = await resp.json();
+
+  if (!resp.ok || !data.ok) {
+    throw new Error(data.error || "Ошибка загрузки отчетов");
+  }
+
+  db.reports = (data.reports || []).map(r => ({
+    id: r.id,
+    manager: r.manager,
+    restaurant: r.restaurant,
+    reason: r.reason,
+    comment: r.comment || "",
+    amount: Number(r.amount) || 0,
+    start: parseDateStr(r.start),
+    end: parseDateStr(r.end),
+    draftId: null
+  }));
+}
+ 
   window.addEventListener('load', async () => {
   try {
-    await loadReportsFromServer();
+    await loadReportsFromServer(); // ⬅️ ВАЖНО
     render();
   } catch (e) {
     alert("Ошибка загрузки данных: " + (e?.message || e));
-    render(); // хотя бы интерфейс покажем
+    render(); // интерфейс всё равно покажем
   }
 });
+
 </script>
 </body>
 </html>
