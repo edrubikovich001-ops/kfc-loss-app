@@ -85,7 +85,11 @@
   };
 
   // Черновики оставляем локально.
-  const STORAGE_KEY = 'kfc_loss_pro_v10';
+  const STORAGE_KEY = 'kfc_loss_pro_v9';
+
+let db = { reports: [], drafts: [] }; // reports только с сервера
+const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { drafts: [] };
+db.drafts = saved.drafts || [];
 
 // reports — ТОЛЬКО с сервера.
 // drafts — локально (это нормально).
