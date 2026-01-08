@@ -32,6 +32,42 @@
     #sum-input{background:transparent;color:var(--kfc-red);font-weight:900;text-align:center;border:none;outline:none;width:100%;}
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
     main::-webkit-scrollbar{display:none;}
+
+    /* overlay / toast */
+    .overlay {
+      position: fixed; inset: 0;
+      display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,.55);
+      z-index: 9999;
+      backdrop-filter: blur(10px);
+    }
+    .overlay.show { display:flex; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(255,255,255,.15);
+      border-top-color: var(--ios-blue);
+      border-radius: 999px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 18px;
+      transform: translateX(-50%);
+      background: rgba(28,28,30,.92);
+      border: 1px solid rgba(255,255,255,.10);
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      z-index: 99999;
+      display: none;
+      max-width: 92vw;
+      text-align: center;
+    }
+    .toast.show { display:block; }
+    .toast small { display:block; opacity:.65; font-weight: 700; margin-top:2px; }
   </style>
 </head>
 
@@ -48,7 +84,7 @@
       </div>
     </div>
 
-    <button onclick="refreshFromServer()" class="text-gray-600 active:scale-90 transition-transform" title="Обновить">
+    <button id="refresh-btn" onclick="refreshFromServer()" class="text-gray-600 active:scale-90 transition-transform" title="Обновить">
       <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
     </button>
   </header>
@@ -63,14 +99,92 @@
   </footer>
 </div>
 
+<!-- overlay + toast -->
+<div id="overlay" class="overlay">
+  <div class="ios-card px-5 py-4 flex items-center gap-3">
+    <div class="spinner"></div>
+    <div>
+      <div id="overlay-title" class="text-sm font-black">Загрузка…</div>
+      <div id="overlay-sub" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Подождите</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
 <script>
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
-  // ПУТИ API
+  // API
   const API = "/api";
 
-  // ДАННЫЕ
+  // --- UI helpers ---
+  const overlayEl = document.getElementById("overlay");
+  const overlayTitleEl = document.getElementById("overlay-title");
+  const overlaySubEl = document.getElementById("overlay-sub");
+  const toastEl = document.getElementById("toast");
+
+  function showOverlay(title="Загрузка…", sub="Подождите.") {
+    overlayTitleEl.textContent = title;
+    overlaySubEl.textContent = sub;
+    overlayEl.classList.add("show");
+  }
+  function hideOverlay() { overlayEl.classList.remove("show"); }
+
+  let toastTimer = null;
+  function showToast(msg, sub="") {
+    toastEl.innerHTML = sub ? `${escapeHtml(msg)}<small>${escapeHtml(sub)}</small>` : escapeHtml(msg);
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2600);
+  }
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  }
+
+  // --- network helpers (timeout + retry/backoff) ---
+  async function fetchWithTimeout(url, options={}, timeoutMs=12000) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { ...options, signal: ctrl.signal });
+      return resp;
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
+  async function apiJson(url, options={}, { retries=4, timeoutMs=12000, onRetry=null } = {}) {
+    let lastErr = null;
+    for (let i=0; i<retries; i++) {
+      try {
+        const resp = await fetchWithTimeout(url, options, timeoutMs);
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        return data;
+      } catch (e) {
+        lastErr = e;
+        if (i < retries - 1) {
+          const delay = Math.min(12000, 800 * Math.pow(2, i)); // 0.8s, 1.6s, 3.2s, 6.4s
+          if (typeof onRetry === "function") onRetry(i+1, delay, e);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
+    }
+    throw lastErr || new Error("Ошибка сети.");
+  }
+
+  // --- request_id helpers (anti-double submit) ---
+  function uuid() {
+    try {
+      if (crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    } catch(_) {}
+    return "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  // Data
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
@@ -89,7 +203,7 @@
   };
 
   // LocalStorage: только черновики
-  const STORAGE_KEY = 'kfc_loss_pro_v9';
+  const STORAGE_KEY = 'kfc_loss_pro_v10';
 
   let db = { reports: [], drafts: [] };
   try {
@@ -137,25 +251,34 @@
     };
   }
 
-  async function apiJson(url, options) {
-    const resp = await fetch(url, options);
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-    return data;
-  }
-
-  async function loadReportsFromServer() {
-    const data = await apiJson(`${API}/reports`, { method: "GET" });
+  async function loadReportsFromServer({ silent=false } = {}) {
+    const data = await apiJson(`${API}/reports`, { method: "GET" }, {
+      retries: 5,
+      timeoutMs: 12000,
+      onRetry: (attempt, delay, err) => {
+        if (!silent) {
+          showToast("Сервер просыпается…", `попытка ${attempt}/5`);
+        }
+      }
+    });
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
+  let isRefreshing = false;
   async function refreshFromServer() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    showOverlay("Обновляем данные…", "Подключаемся к серверу.");
     try {
-      await loadReportsFromServer();
+      await loadReportsFromServer({ silent:false });
       render();
-      if (tg) tg.showPopup({ title: "Готово", message: "Данные обновлены с сервера.", buttons: [{ type: "ok" }] });
+      if (tg) tg.showPopup({ title: "Готово", message: "Данные обновлены.", buttons: [{ type: "ok" }] });
+      else showToast("Данные обновлены.");
     } catch (e) {
       alert("Не удалось обновить данные: " + (e?.message || e));
+    } finally {
+      hideOverlay();
+      isRefreshing = false;
     }
   }
 
@@ -169,11 +292,13 @@
     analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
     analyticsTab: 'restaurants',
     draftId: null,
-    editId: null
+    editId: null,
+    requestId: null // <--- антидубль при POST
   };
 
   let historyStack = ['main'];
 
+  // --- render ---
   function render() {
     const container = document.getElementById('view-container');
     const footer = document.getElementById('footer-actions');
@@ -256,8 +381,11 @@
       title.innerText = "Комментарий";
       container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
       footer.classList.remove('hidden');
-      document.getElementById('primary-btn').innerText = "Далее";
-      document.getElementById('primary-btn').onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
+      const btn = document.getElementById('primary-btn');
+      btn.innerText = "Далее";
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
     }
 
     else if (state.view === 'calendar') {
@@ -300,8 +428,11 @@
 
       initWheels(cur);
       footer.classList.remove('hidden');
-      document.getElementById('primary-btn').innerText = isStart ? "Установить конец" : "Далее";
-      document.getElementById('primary-btn').onclick = () => {
+      const btn = document.getElementById('primary-btn');
+      btn.innerText = isStart ? "Установить конец" : "Далее";
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.onclick = () => {
         const v = getWheels();
         if (isStart) {
           state.start.hour=v.h; state.start.min=v.m;
@@ -334,10 +465,21 @@
           <p class="text-[10px] text-gray-500 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
         </div>
       `;
+
+      // requestId создаём заранее, чтобы повторные клики/ретраи не плодили записи
+      if (!state.editId && !state.requestId) state.requestId = uuid();
+
       footer.classList.remove('hidden');
-      document.getElementById('primary-btn').innerText = state.editId ? "Сохранить" : "Завершить";
-      document.getElementById('primary-btn').onclick = saveReport;
-      setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
+      const btn = document.getElementById('primary-btn');
+      btn.innerText = state.editId ? "Сохранить" : "Завершить";
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.onclick = saveReport;
+
+      setTimeout(() => {
+        const inp=document.getElementById('sum-input');
+        if(inp){ inp.focus(); scaleSumInput(inp);}
+      }, 100);
     }
 
     else if (state.view === 'analytics_period') {
@@ -387,8 +529,11 @@
       if (cal.start && cal.end) {
         footer.classList.remove('hidden');
         laterBtn.classList.add('hidden');
-        document.getElementById('primary-btn').innerText = "Показать";
-        document.getElementById('primary-btn').onclick = () => { state.filter='custom'; navigate('analytics_view'); };
+        const btn = document.getElementById('primary-btn');
+        btn.innerText = "Показать";
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.onclick = () => { state.filter='custom'; navigate('analytics_view'); };
       }
     }
 
@@ -428,10 +573,10 @@
           ${db.reports.map(r => `
             <div class="ios-card p-4">
               <div class="flex justify-between mb-1">
-                <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${r.manager}</span>
+                <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${escapeHtml(r.manager)}</span>
                 <span class="text-sm font-black text-red-500">${Number(r.amount).toLocaleString()} ₸</span>
               </div>
-              <p class="text-xs font-bold truncate">${(r.restaurant || '').split(' — ')[1] || r.restaurant}</p>
+              <p class="text-xs font-bold truncate">${escapeHtml(((r.restaurant || '').split(' — ')[1] || r.restaurant))}</p>
               <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">
                 ${pad2(r.start.day)}.${pad2(r.start.month+1)} ${pad2(r.start.hour)}:${pad2(r.start.min)}
                 —
@@ -463,8 +608,8 @@
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
-            <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
-            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
+            <span class="text-xs font-bold truncate">${escapeHtml((name || '').includes(' — ') ? name.split(' — ')[1] : name)}</span>
+            <span class="text-[9px] text-gray-500 font-bold uppercase">${escapeHtml((name || '').includes(' — ') ? name.split(' — ')[0] : '')}</span>
           </div>
           <div class="text-right flex flex-col items-end">
             <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
@@ -483,7 +628,7 @@
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-center mb-1">
-          <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
+          <span class="text-xs font-bold uppercase tracking-tight">${escapeHtml(reason)}</span>
           <div class="text-right flex flex-col items-end">
             <span class="text-sm font-black text-red-500">${sum.toLocaleString()} ₸</span>
             <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
@@ -494,6 +639,7 @@
     }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
   }
 
+  // drafts
   function saveDraft() {
     if (state.view === 'calendar') {
       const v = getWheels();
@@ -530,15 +676,21 @@
     render();
   }
 
+  // excel
   function exportExcelServer() {
     const url = `${window.location.origin}${API}/export.xlsx`;
     if (tg && typeof tg.openLink === "function") { tg.openLink(url); return; }
     window.location.href = url;
   }
 
+  // save report (anti double click + retry)
+  let isSaving = false;
   async function saveReport() {
-    const val = parseInt(document.getElementById('sum-input').value) || 0;
-    if (val <= 0) return;
+    if (isSaving) return;
+
+    const inp = document.getElementById('sum-input');
+    const val = parseInt(inp?.value || "0", 10) || 0;
+    if (val <= 0) { showToast("Укажи сумму больше нуля."); return; }
 
     state.amount = val;
 
@@ -555,24 +707,59 @@
       comment: state.comment || '-'
     };
 
+    // request_id только на создание (POST), чтобы ретраи не плодили записи
+    if (!state.editId) {
+      if (!state.requestId) state.requestId = uuid();
+      payload.request_id = state.requestId;
+    }
+
+    const isEdit = !!state.editId;
+    const btn = document.getElementById('primary-btn');
+
     try {
-      const isEdit = !!state.editId;
-      const data = await apiJson(isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`, {
+      isSaving = true;
+      btn.disabled = true;
+      btn.style.opacity = "0.7";
+      btn.innerText = isEdit ? "Сохраняю…" : "Отправляю…";
+      showOverlay(isEdit ? "Сохраняем…" : "Отправляем…", "Если сервер спит — разбудим.");
+
+      await apiJson(isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
+      }, {
+        retries: 4,
+        timeoutMs: 15000,
+        onRetry: (attempt, delay) => {
+          showToast("Повторяем отправку…", `попытка ${attempt}/4`);
+        }
       });
 
-      await loadReportsFromServer();
+      // обновим данные с сервера (только сервер — источник истины)
+      await loadReportsFromServer({ silent:true });
 
+      // удаляем черновик локально, если был
       if (state.draftId) {
         db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
         saveDraftsToLS();
       }
 
-      state.view='main'; historyStack=['main']; state.editId=null; render();
+      // сброс requestId после успешной отправки
+      state.requestId = null;
+
+      state.view='main';
+      historyStack=['main'];
+      state.editId=null;
+      render();
+      showToast("Готово.", "Запись сохранена.");
     } catch (e) {
       alert(`Ошибка: ${e?.message || 'unknown'}`);
+    } finally {
+      hideOverlay();
+      isSaving = false;
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.innerText = isEdit ? "Сохранить" : "Завершить";
     }
   }
 
@@ -594,7 +781,8 @@
       analyticsCal: state.analyticsCal,
       analyticsTab: state.analyticsTab || 'restaurants',
       draftId: null,
-      editId: id
+      editId: id,
+      requestId: null
     };
 
     historyStack = ['main','history','comment'];
@@ -603,37 +791,46 @@
 
   async function deleteReport(id) {
     if (!confirm("Удалить этот инцидент?")) return;
+    showOverlay("Удаляем…", "Подключаемся к серверу.");
     try {
-      await apiJson(`${API}/reports/${id}`, { method: "DELETE" });
-      await loadReportsFromServer();
+      await apiJson(`${API}/reports/${id}`, { method: "DELETE" }, { retries: 3, timeoutMs: 12000 });
+      await loadReportsFromServer({ silent:true });
       render();
+      showToast("Удалено.");
     } catch (e) {
       alert("Ошибка: " + (e?.message || e));
+    } finally {
+      hideOverlay();
     }
   }
 
+  // flow
   function startFlow() {
+    const now = getNowObj();
     state = {
       view:'managers',
       manager:'', restaurant:'', reason:'', comment:'',
-      start:getNowObj(),
-      end:getNowObj(),
+      start: JSON.parse(JSON.stringify(now)),
+      end: JSON.parse(JSON.stringify(now)),
       stage:'start',
       amount:0,
       filter: state.filter,
       analyticsCal: state.analyticsCal,
       analyticsTab: 'restaurants',
       draftId: null,
-      editId: null
+      editId: null,
+      requestId: null
     };
-    navigate('managers');
+    historyStack = ['main','managers'];
+    render();
   }
 
   function navigate(v){ historyStack.push(v); state.view=v; render(); }
   function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
   function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
-  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
+  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v,10); render(); }
 
+  // analytics
   function setAnalyticsDate(ts){
     if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
       state.analyticsCal.start=ts; state.analyticsCal.end=null;
@@ -652,7 +849,7 @@
   }
 
   function scaleSumInput(input){
-    const val=input.value;
+    const val=(input.value || "");
     if(val.length>7) input.style.fontSize='32px';
     else if(val.length>5) input.style.fontSize='44px';
     else input.style.fontSize='60px';
@@ -682,6 +879,7 @@
     });
   }
 
+  // wheels
   function initWheels(t){
     setTimeout(() => {
       const h=document.getElementById('h-w'), m=document.getElementById('m-w');
@@ -704,13 +902,18 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
+  // init
   window.addEventListener('load', async () => {
+    showOverlay("Запуск…", "Подключаемся к серверу.");
     try {
-      await loadReportsFromServer();
+      await loadReportsFromServer({ silent:false });
+      showToast("Готово.", "Данные загружены.");
     } catch (e) {
       alert("Ошибка загрузки данных: " + (e?.message || e));
+    } finally {
+      hideOverlay();
+      render();
     }
-    render();
   });
 </script>
 </body>
