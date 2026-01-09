@@ -73,7 +73,7 @@
 
   const dataTU = {
     "Zhaidary Talapova": ["12734 — KFC ATAKENT","12774 — KFC Asia Park Almaty","12775 — KFC MAGNUM – RELOCATION","12776 — KFC Malika","12777 — KFC Sever – Shymkent City","12779 — KFC Mart","12799 — KFC Saryarka Almaty","12800 — KFC Masato","12801 — KFC Aksai","12807 — KFC SPUTNIK MALL","12819 — KFC GRAND PARK ALMATY","12832 — KFC ALMATY AIRPORT"],
-    "Valeriya Toishiyeva": ["12748 — KFC Shymkent Plaza","12758 — KFC VAZ","12760 — KFC LEMON","12798 — KFC Compass","12804 — KFC GRES","12824 — KFC MEGA MALL SHYMKENT’s","12839 — KFC Shymkent Tashkent RP","12841 — KFC Dala Mall Shymkent","12843 — KFC Shymkent City Mall"],
+    "Valeriya Toishiyeva": ["12748 — KFC Shymkent Plaza","12758 — KFC VAZ","12760 — KFC LEMON","12798 — KFC Compass","12804 — KFC GRES","12824 — KFC MEGA MALL SHYMKENT","12839 — KFC Shymkent Tashkent RP","12841 — KFC Dala Mall Shymkent","12843 — KFC Shymkent City Mall"],
     "Ulan Toiganbayev": ["12711 — KFC ADK","12712 — KFC Googla","12725 — KFC Mega Park","12729 — KFC Tole Bi","12730 — KFC Moscow Mall","12747 — KFC Central Stadium – Akotobe","12753 — KFC Keruen City Mall – Aktobe","12756 — KFC SILKWAY CITY","12773 — KFC TSUM"],
     "Nurlan Ataibekov": ["12703 — KFC Mega Almaty","12704 — KFC Domillion","12713 — KFC Aport","12732 — KFC Adem","12761 — KFC Kulager","12770 — KFC Ainabulak","12790 — KFC Kaskelen","12808 — KFC COMPASS BISHKEK HIGHWAY","12816 — KFC APORT MIAMI"],
     "Nikol Tyurina": ["12702 — KFC Mega Astana","12715 — KFC City Mall Karaganda","12723 — KFC Bogembay","12728 — KFC Green","12731 — KFC Flag Karaganda","12755 — KFC LITE ASTRAHANKA","12810 — KFC TEMIRTAU","12814 — KFC SYGANAK","12818 — KFC Food City Astana","12828 — KFC INCITY ASTANA"],
@@ -108,7 +108,6 @@
   }
 
   function parseRuDateTime(str) {
-    // "dd.mm.yyyy hh:mm"
     if (!str || typeof str !== "string") return null;
     const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
     if (!m) return null;
@@ -156,7 +155,24 @@
     }
   }
 
-  // STATE (ВАЖНО: requestId хранится, чтобы не было дублей)
+  // ===== Анти-дубль: блокировка кнопки и request_id =====
+  let savingNow = false;
+
+  function genRequestId() {
+    // стабильный уникальный id под отправку (чтобы даже при повторной отправке сервер не создал дубль)
+    return "req_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function setPrimaryDisabled(disabled, text) {
+    const btn = document.getElementById('primary-btn');
+    if (!btn) return;
+    btn.disabled = !!disabled;
+    btn.classList.toggle("opacity-50", !!disabled);
+    btn.classList.toggle("pointer-events-none", !!disabled);
+    if (text) btn.innerText = text;
+  }
+
+  // STATE
   let state = {
     view: 'main',
     manager: '', restaurant: '', reason: '', comment: '',
@@ -166,8 +182,7 @@
     analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
     analyticsTab: 'restaurants',
     draftId: null,
-    editId: null,
-    requestId: null
+    editId: null
   };
 
   let historyStack = ['main'];
@@ -355,6 +370,41 @@
       });
     }
 
+    else if (state.view === 'analytics_custom') {
+      title.innerText = "Период";
+      const cal = state.analyticsCal;
+      const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
+      const daysInMonth = new Date(cal.year, cal.month + 1, 0).getDate();
+
+      container.innerHTML = `
+        <div class="ios-card p-5">
+          <div class="flex justify-between items-center mb-6">
+            <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5"><i data-lucide="chevron-left"></i></button>
+            <span class="font-bold text-sm uppercase tracking-widest">${monthNames[cal.month]} ${cal.year}</span>
+            <button onclick="changeCalMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5"><i data-lucide="chevron-right"></i></button>
+          </div>
+
+          <div class="cal-grid">
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+            ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
+            ${Array.from({length:daysInMonth}).map((_, i) => {
+              const ts = new Date(cal.year, cal.month, i+1).getTime();
+              const sel = (cal.start && ts === cal.start) || (cal.end && ts === cal.end);
+              const rng = cal.start && cal.end && ts > cal.start && ts < cal.end;
+              return `<div onclick="setAnalyticsDate(${ts})" class="day-btn ${sel?'selected':''} ${rng?'range':''}">${i+1}</div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      if (cal.start && cal.end) {
+        footer.classList.remove('hidden');
+        laterBtn.classList.add('hidden');
+        document.getElementById('primary-btn').innerText = "Показать";
+        document.getElementById('primary-btn').onclick = () => { state.filter='custom'; navigate('analytics_view'); };
+      }
+    }
+
     else if (state.view === 'analytics_view') {
       title.innerText = "Итоги";
       const filtered = filterAnalytics(db.reports);
@@ -499,45 +549,40 @@
     window.location.href = url;
   }
 
-  // ✅ АНТИ-ДУБЛИ: requestId создаётся один раз и сохраняется до успешного ответа.
-  function ensureRequestId() {
-    if (!state.requestId) {
-      state.requestId = `r_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    }
-    return state.requestId;
-  }
-
   async function saveReport() {
-    const val = parseInt(document.getElementById('sum-input').value) || 0;
-    if (val <= 0) return;
+    // анти-дубль на клиенте
+    if (savingNow) return;
+    savingNow = true;
 
-    state.amount = val;
-
-    const startStr = `${pad2(state.start.day)}.${pad2(state.start.month+1)}.${state.start.year} ${pad2(state.start.hour)}:${pad2(state.start.min)}`;
-    const endStr   = `${pad2(state.end.day)}.${pad2(state.end.month+1)}.${state.end.year} ${pad2(state.end.hour)}:${pad2(state.end.min)}`;
-
-    const isEdit = !!state.editId;
-
-    const payload = {
-      manager: state.manager,
-      restaurant: state.restaurant,
-      reason: state.reason,
-      amount: state.amount,
-      start: startStr,
-      end: endStr,
-      comment: state.comment || '-',
-      ...(isEdit ? {} : { request_id: ensureRequestId() })
-    };
+    const btnText = state.editId ? "Сохранение..." : "Отправка...";
+    setPrimaryDisabled(true, btnText);
 
     try {
+      const val = parseInt(document.getElementById('sum-input').value) || 0;
+      if (val <= 0) throw new Error("Укажи сумму больше нуля.");
+
+      state.amount = val;
+
+      const startStr = `${pad2(state.start.day)}.${pad2(state.start.month+1)}.${state.start.year} ${pad2(state.start.hour)}:${pad2(state.start.min)}`;
+      const endStr   = `${pad2(state.end.day)}.${pad2(state.end.month+1)}.${state.end.year} ${pad2(state.end.hour)}:${pad2(state.end.min)}`;
+
+      const payload = {
+        manager: state.manager,
+        restaurant: state.restaurant,
+        reason: state.reason,
+        amount: state.amount,
+        start: startStr,
+        end: endStr,
+        comment: state.comment || '-',
+        request_id: genRequestId()
+      };
+
+      const isEdit = !!state.editId;
       await apiJson(isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-
-      // Успешно → очищаем requestId, чтобы следующий инцидент был новым.
-      state.requestId = null;
 
       await loadReportsFromServer();
 
@@ -546,9 +591,15 @@
         saveDraftsToLS();
       }
 
-      state.view='main'; historyStack=['main']; state.editId=null; render();
+      state.view='main';
+      historyStack=['main'];
+      state.editId=null;
+      render();
     } catch (e) {
       alert(`Ошибка: ${e?.message || 'unknown'}`);
+      setPrimaryDisabled(false, state.editId ? "Сохранить" : "Завершить");
+    } finally {
+      savingNow = false;
     }
   }
 
@@ -570,8 +621,7 @@
       analyticsCal: state.analyticsCal,
       analyticsTab: state.analyticsTab || 'restaurants',
       draftId: null,
-      editId: id,
-      requestId: null
+      editId: id
     };
 
     historyStack = ['main','history','comment'];
@@ -601,8 +651,7 @@
       analyticsCal: state.analyticsCal,
       analyticsTab: 'restaurants',
       draftId: null,
-      editId: null,
-      requestId: null
+      editId: null
     };
     navigate('managers');
   }
@@ -612,17 +661,50 @@
   function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
   function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
 
+  function setAnalyticsDate(ts){
+    if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
+      state.analyticsCal.start=ts; state.analyticsCal.end=null;
+    } else {
+      if(ts < state.analyticsCal.start){ state.analyticsCal.end=state.analyticsCal.start; state.analyticsCal.start=ts; }
+      else state.analyticsCal.end=ts;
+    }
+    render();
+  }
+
+  function changeCalMonth(s){
+    state.analyticsCal.month += s;
+    if(state.analyticsCal.month>11){state.analyticsCal.month=0;state.analyticsCal.year++;}
+    if(state.analyticsCal.month<0){state.analyticsCal.month=11;state.analyticsCal.year--;}
+    render();
+  }
+
+  function scaleSumInput(input){
+    const val=input.value;
+    if(val.length>7) input.style.fontSize='32px';
+    else if(val.length>5) input.style.fontSize='44px';
+    else input.style.fontSize='60px';
+  }
+
   function filterAnalytics(reports){
     const now=new Date();
     const startOfToday=new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
     return reports.filter(r => {
       const ts = r.start?.ts || r.created_at || 0;
+
       if(state.filter==='today') return ts >= startOfToday;
+
       if(state.filter==='week') {
         const dow = (now.getDay() || 7) - 1;
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
+
+      if(state.filter==='custom') {
+        if (!state.analyticsCal.start || !state.analyticsCal.end) return true;
+        return ts >= state.analyticsCal.start && ts <= (state.analyticsCal.end + 86400000);
+      }
+
       return true;
     });
   }
@@ -649,16 +731,12 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  function scaleSumInput(input){
-    const val=input.value;
-    if(val.length>7) input.style.fontSize='32px';
-    else if(val.length>5) input.style.fontSize='44px';
-    else input.style.fontSize='60px';
-  }
-
   window.addEventListener('load', async () => {
-    try { await loadReportsFromServer(); }
-    catch (e) { alert("Ошибка загрузки данных: " + (e?.message || e)); }
+    try {
+      await loadReportsFromServer();
+    } catch (e) {
+      alert("Ошибка загрузки данных: " + (e?.message || e));
+    }
     render();
   });
 </script>
