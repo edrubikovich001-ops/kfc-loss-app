@@ -1,3 +1,4 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -31,6 +32,7 @@
     #sum-input{background:transparent;color:var(--kfc-red);font-weight:900;text-align:center;border:none;outline:none;width:100%;}
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
     main::-webkit-scrollbar{display:none;}
+    .btn-disabled{opacity:.5; pointer-events:none;}
   </style>
 </head>
 
@@ -86,7 +88,7 @@
   };
 
   // LocalStorage: только черновики
-  const STORAGE_KEY = 'kfc_loss_pro_v9';
+  const STORAGE_KEY = "kfc_loss_pro_v9";
 
   let db = { reports: [], drafts: [] };
   try {
@@ -100,7 +102,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
   }
 
-  function pad2(n){ return String(n).padStart(2,'0'); }
+  function pad2(n){ return String(n).padStart(2,"0"); }
 
   function getNowObj() {
     const d = new Date();
@@ -122,10 +124,10 @@
     const endObj = parseRuDateTime(r.end) || startObj;
     return {
       id: Number(r.id),
-      manager: r.manager || '',
-      restaurant: r.restaurant || '',
-      reason: r.reason || '',
-      comment: r.comment || '',
+      manager: r.manager || "",
+      restaurant: r.restaurant || "",
+      reason: r.reason || "",
+      comment: r.comment || "",
       amount: Number(r.amount) || 0,
       start: startObj,
       end: endObj,
@@ -155,51 +157,47 @@
     }
   }
 
-  // ===== Анти-дубль: блокировка кнопки и request_id =====
-  let savingNow = false;
-
-  function genRequestId() {
-    // стабильный уникальный id под отправку (чтобы даже при повторной отправке сервер не создал дубль)
-    return "req_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-  }
-
-  function setPrimaryDisabled(disabled, text) {
-    const btn = document.getElementById('primary-btn');
-    if (!btn) return;
-    btn.disabled = !!disabled;
-    btn.classList.toggle("opacity-50", !!disabled);
-    btn.classList.toggle("pointer-events-none", !!disabled);
-    if (text) btn.innerText = text;
-  }
-
   // STATE
   let state = {
-    view: 'main',
-    manager: '', restaurant: '', reason: '', comment: '',
-    start: null, end: null, stage: 'start',
+    view: "main",
+    manager: "", restaurant: "", reason: "", comment: "",
+    start: null, end: null, stage: "start",
     amount: 0,
-    filter: 'all',
+    filter: "all",
     analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
-    analyticsTab: 'restaurants',
+    analyticsTab: "restaurants",
     draftId: null,
-    editId: null
+    editId: null,
+    requestId: null
   };
 
-  let historyStack = ['main'];
+  let historyStack = ["main"];
+  let saving = false;
+
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function setPrimaryDisabled(disabled) {
+    const btn = document.getElementById("primary-btn");
+    if (!btn) return;
+    btn.classList.toggle("btn-disabled", !!disabled);
+  }
 
   function render() {
-    const container = document.getElementById('view-container');
-    const footer = document.getElementById('footer-actions');
-    const backBtn = document.getElementById('back-btn');
-    const title = document.getElementById('header-title');
-    const laterBtn = document.getElementById('later-btn');
+    const container = document.getElementById("view-container");
+    const footer = document.getElementById("footer-actions");
+    const backBtn = document.getElementById("back-btn");
+    const title = document.getElementById("header-title");
+    const laterBtn = document.getElementById("later-btn");
 
-    container.innerHTML = '';
-    backBtn.classList.toggle('hidden', state.view === 'main');
-    footer.classList.add('hidden');
-    laterBtn.classList.remove('hidden');
+    container.innerHTML = "";
+    backBtn.classList.toggle("hidden", state.view === "main");
+    footer.classList.add("hidden");
+    laterBtn.classList.remove("hidden");
 
-    if (state.view === 'main') {
+    if (state.view === "main") {
       title.innerText = "KFC";
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
@@ -223,9 +221,9 @@
                   <div class="text-left overflow-hidden mr-2">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="draft-badge">Продолжить</span>
-                      <span class="text-[9px] font-bold text-gray-500 uppercase">${d.manager || '...'}</span>
+                      <span class="text-[9px] font-bold text-gray-500 uppercase">${d.manager || "..."}</span>
                     </div>
-                    <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(' — ')[1] : 'Новый отчет'}</p>
+                    <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(" — ")[1] : "Новый отчет"}</p>
                   </div>
                   <i data-lucide="chevron-right" class="w-4 h-4 text-gray-700"></i>
                 </button>
@@ -233,9 +231,9 @@
                   <i data-lucide="x" class="w-3 h-3"></i>
                 </button>
               </div>
-            `).join('')}
+            `).join("")}
           </div>
-        </div>` : ''}
+        </div>` : ""}
 
         <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
           <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500"><i data-lucide="history"></i></div>
@@ -244,37 +242,37 @@
       `;
     }
 
-    else if (state.view === 'managers') {
+    else if (state.view === "managers") {
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
       Object.keys(dataTU).sort().forEach(m => {
         container.innerHTML += `<button onclick="state.manager='${m}';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
       });
     }
 
-    else if (state.view === 'restaurants') {
+    else if (state.view === "restaurants") {
       title.innerText = "Ресторан";
       (dataTU[state.manager] || []).forEach(r => {
         container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
 
-    else if (state.view === 'reasons') {
+    else if (state.view === "reasons") {
       title.innerText = "Причина";
       ["Внешние факторы","Отсутствие продукта","Персонал","Внутренние факторы"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
 
-    else if (state.view === 'comment') {
+    else if (state.view === "comment") {
       title.innerText = "Комментарий";
-      container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
-      footer.classList.remove('hidden');
-      document.getElementById('primary-btn').innerText = "Далее";
-      document.getElementById('primary-btn').onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
+      container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ""}</textarea></div>`;
+      footer.classList.remove("hidden");
+      document.getElementById("primary-btn").innerText = "Далее";
+      document.getElementById("primary-btn").onclick = () => { state.comment = document.getElementById("comm").value; navigate("calendar"); };
     }
 
-    else if (state.view === 'calendar') {
-      const isStart = state.stage === 'start';
+    else if (state.view === "calendar") {
+      const isStart = state.stage === "start";
       const cur = isStart ? state.start : state.end;
       title.innerText = isStart ? "Начало" : "Конец";
 
@@ -287,7 +285,7 @@
           <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
             <p class="text-[8px] uppercase font-black text-blue-500 mb-1 tracking-widest">Начало</p>
             <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${pad2(state.start.hour)}:${pad2(state.start.min)}</p>
-          </div>` : ''}
+          </div>` : ""}
 
           <div class="flex justify-between items-center mb-6">
             <span class="text-lg font-bold">${cur.day} ${monthNamesGenitive[cur.month]}</span>
@@ -296,41 +294,41 @@
 
           <div class="flex gap-2 mb-6 justify-center">
             <select onchange="updateFlowDate('month', this.value)" class="ios-select">
-              ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? 'selected' : ''}>${m}</option>`).join('')}
+              ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? "selected" : ""}>${m}</option>`).join("")}
             </select>
             <select onchange="updateFlowDate('year', this.value)" class="ios-select">
-              ${[2024,2025,2026].map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
+              ${[2024,2025,2026].map(y => `<option value="${y}" ${y === cur.year ? "selected" : ""}>${y}</option>`).join("")}
             </select>
           </div>
 
           <div class="cal-grid">
-            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
-            ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
-            ${Array.from({length:daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?'selected':''}">${i+1}</div>`).join('')}
+            ${["П","В","С","Ч","П","С","В"].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join("")}
+            ${Array.from({length:firstDay}).map(() => `<div></div>`).join("")}
+            ${Array.from({length:daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?"selected":""}">${i+1}</div>`).join("")}
           </div>
         </div>
       `;
 
       initWheels(cur);
-      footer.classList.remove('hidden');
-      document.getElementById('primary-btn').innerText = isStart ? "Установить конец" : "Далее";
-      document.getElementById('primary-btn').onclick = () => {
+      footer.classList.remove("hidden");
+      document.getElementById("primary-btn").innerText = isStart ? "Установить конец" : "Далее";
+      document.getElementById("primary-btn").onclick = () => {
         const v = getWheels();
         if (isStart) {
           state.start.hour=v.h; state.start.min=v.m;
           state.start.ts = new Date(state.start.year, state.start.month, state.start.day, state.start.hour, state.start.min).getTime();
-          state.stage='end';
+          state.stage="end";
           state.end=JSON.parse(JSON.stringify(state.start));
           render();
         } else {
           state.end.hour=v.h; state.end.min=v.m;
           state.end.ts = new Date(state.end.year, state.end.month, state.end.day, state.end.hour, state.end.min).getTime();
-          navigate('sum');
+          navigate("sum");
         }
       };
     }
 
-    else if (state.view === 'sum') {
+    else if (state.view === "sum") {
       title.innerText = "Сумма";
       container.innerHTML = `
         <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
@@ -343,21 +341,21 @@
         </div>
 
         <div class="flex flex-col items-center py-12">
-          <input type="number" id="sum-input" placeholder="0" value="${state.amount || ''}" class="text-6xl font-black" oninput="scaleSumInput(this)">
+          <input type="number" id="sum-input" placeholder="0" value="${state.amount || ""}" class="text-6xl font-black" oninput="scaleSumInput(this)">
           <p class="text-[10px] text-gray-500 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
         </div>
       `;
-      footer.classList.remove('hidden');
-      document.getElementById('primary-btn').innerText = state.editId ? "Сохранить" : "Завершить";
-      document.getElementById('primary-btn').onclick = saveReport;
-      setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
+      footer.classList.remove("hidden");
+      document.getElementById("primary-btn").innerText = state.editId ? "Сохранить" : "Завершить";
+      document.getElementById("primary-btn").onclick = saveReport;
+      setTimeout(() => { const inp=document.getElementById("sum-input"); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
     }
 
-    else if (state.view === 'analytics_period') {
+    else if (state.view === "analytics_period") {
       title.innerText = "Аналитика";
-      [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}]
+      [{id:"today",n:"Сегодня"},{id:"week",n:"Эта неделя"},{id:"custom",n:"Свой диапазон"},{id:"all",n:"Весь период"}]
       .forEach(opt => {
-        const handler = (opt.id === 'custom')
+        const handler = (opt.id === "custom")
           ? "navigate('analytics_custom')"
           : `state.filter='${opt.id}';navigate('analytics_view')`;
 
@@ -370,7 +368,7 @@
       });
     }
 
-    else if (state.view === 'analytics_custom') {
+    else if (state.view === "analytics_custom") {
       title.innerText = "Период";
       const cal = state.analyticsCal;
       const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
@@ -385,27 +383,27 @@
           </div>
 
           <div class="cal-grid">
-            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
-            ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
+            ${["П","В","С","Ч","П","С","В"].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join("")}
+            ${Array.from({length:firstDay}).map(() => `<div></div>`).join("")}
             ${Array.from({length:daysInMonth}).map((_, i) => {
               const ts = new Date(cal.year, cal.month, i+1).getTime();
               const sel = (cal.start && ts === cal.start) || (cal.end && ts === cal.end);
               const rng = cal.start && cal.end && ts > cal.start && ts < cal.end;
-              return `<div onclick="setAnalyticsDate(${ts})" class="day-btn ${sel?'selected':''} ${rng?'range':''}">${i+1}</div>`;
-            }).join('')}
+              return `<div onclick="setAnalyticsDate(${ts})" class="day-btn ${sel?"selected":""} ${rng?"range":""}">${i+1}</div>`;
+            }).join("")}
           </div>
         </div>
       `;
 
       if (cal.start && cal.end) {
-        footer.classList.remove('hidden');
-        laterBtn.classList.add('hidden');
-        document.getElementById('primary-btn').innerText = "Показать";
-        document.getElementById('primary-btn').onclick = () => { state.filter='custom'; navigate('analytics_view'); };
+        footer.classList.remove("hidden");
+        laterBtn.classList.add("hidden");
+        document.getElementById("primary-btn").innerText = "Показать";
+        document.getElementById("primary-btn").onclick = () => { state.filter="custom"; navigate("analytics_view"); };
       }
     }
 
-    else if (state.view === 'analytics_view') {
+    else if (state.view === "analytics_view") {
       title.innerText = "Итоги";
       const filtered = filterAnalytics(db.reports);
       const totalSum = filtered.reduce((a, b) => a + b.amount, 0);
@@ -426,12 +424,12 @@
         </div>
 
         <div class="space-y-4 pb-24">
-          ${state.analyticsTab === 'restaurants' ? renderRestList(filtered, totalSum) : renderReasonList(filtered, totalSum)}
+          ${state.analyticsTab === "restaurants" ? renderRestList(filtered, totalSum) : renderReasonList(filtered, totalSum)}
         </div>
       `;
     }
 
-    else if (state.view === 'history') {
+    else if (state.view === "history") {
       title.innerText = "История";
 
       if (!db.reports.length) {
@@ -444,7 +442,7 @@
                 <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${r.manager}</span>
                 <span class="text-sm font-black text-red-500">${Number(r.amount).toLocaleString()} ₸</span>
               </div>
-              <p class="text-xs font-bold truncate">${(r.restaurant || '').split(' — ')[1] || r.restaurant}</p>
+              <p class="text-xs font-bold truncate">${(r.restaurant || "").split(" — ")[1] || r.restaurant}</p>
               <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">
                 ${pad2(r.start.day)}.${pad2(r.start.month+1)} ${pad2(r.start.hour)}:${pad2(r.start.min)}
                 —
@@ -460,7 +458,7 @@
                 </button>
               </div>
             </div>
-          `).join('')}
+          `).join("")}
         </div>`;
       }
     }
@@ -476,8 +474,8 @@
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
-            <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
-            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
+            <span class="text-xs font-bold truncate">${(name || "").includes(" — ") ? name.split(" — ")[1] : name}</span>
+            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || "").includes(" — ") ? name.split(" — ")[0] : ""}</span>
           </div>
           <div class="text-right flex flex-col items-end">
             <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
@@ -486,7 +484,7 @@
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
-    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    }).join("") || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
   }
 
   function renderReasonList(reports, total) {
@@ -504,35 +502,35 @@
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
-    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    }).join("") || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
   }
 
   function saveDraft() {
-    if (state.view === 'calendar') {
+    if (state.view === "calendar") {
       const v = getWheels();
-      if (state.stage === 'start') { state.start.hour=v.h; state.start.min=v.m; }
+      if (state.stage === "start") { state.start.hour=v.h; state.start.min=v.m; }
       else { state.end.hour=v.h; state.end.min=v.m; }
     }
-    if (state.view === 'comment') state.comment = document.getElementById('comm').value;
-    if (state.view === 'sum') state.amount = parseInt(document.getElementById('sum-input').value) || 0;
+    if (state.view === "comment") state.comment = document.getElementById("comm").value;
+    if (state.view === "sum") state.amount = parseInt(document.getElementById("sum-input").value) || 0;
 
-    if (!state.draftId) state.draftId = 'd_' + Date.now();
+    if (!state.draftId) state.draftId = "d_" + Date.now();
     const idx = db.drafts.findIndex(d => d.draftId === state.draftId);
     if (idx !== -1) db.drafts[idx] = JSON.parse(JSON.stringify(state));
     else db.drafts.push(JSON.parse(JSON.stringify(state)));
 
     saveDraftsToLS();
-    state.view='main'; historyStack=['main']; render();
+    state.view="main"; historyStack=["main"]; render();
   }
 
   function resumeDraft(id) {
     const d = db.drafts.find(it => it.draftId === id);
     if (d) {
       state = JSON.parse(JSON.stringify(d));
-      state.view='calendar';
-      state.stage='end';
+      state.view="calendar";
+      state.stage="end";
       if (!state.end) state.end = JSON.parse(JSON.stringify(state.start));
-      historyStack=['main','calendar'];
+      historyStack=["main","calendar"];
       render();
     }
   }
@@ -550,21 +548,21 @@
   }
 
   async function saveReport() {
-    // анти-дубль на клиенте
-    if (savingNow) return;
-    savingNow = true;
-
-    const btnText = state.editId ? "Сохранение..." : "Отправка...";
-    setPrimaryDisabled(true, btnText);
+    if (saving) return;
+    saving = true;
+    setPrimaryDisabled(true);
 
     try {
-      const val = parseInt(document.getElementById('sum-input').value) || 0;
-      if (val <= 0) throw new Error("Укажи сумму больше нуля.");
+      const val = parseInt(document.getElementById("sum-input").value) || 0;
+      if (val <= 0) { saving=false; setPrimaryDisabled(false); return; }
 
       state.amount = val;
 
       const startStr = `${pad2(state.start.day)}.${pad2(state.start.month+1)}.${state.start.year} ${pad2(state.start.hour)}:${pad2(state.start.min)}`;
       const endStr   = `${pad2(state.end.day)}.${pad2(state.end.month+1)}.${state.end.year} ${pad2(state.end.hour)}:${pad2(state.end.min)}`;
+
+      // request_id нужен для защиты от дублей при повторной отправке
+      if (!state.requestId) state.requestId = uuid();
 
       const payload = {
         manager: state.manager,
@@ -573,8 +571,8 @@
         amount: state.amount,
         start: startStr,
         end: endStr,
-        comment: state.comment || '-',
-        request_id: genRequestId()
+        comment: state.comment || "-",
+        request_id: state.requestId
       };
 
       const isEdit = !!state.editId;
@@ -591,15 +589,18 @@
         saveDraftsToLS();
       }
 
-      state.view='main';
-      historyStack=['main'];
+      // Сброс состояния
+      state.view="main";
       state.editId=null;
+      state.requestId=null;
+      historyStack=["main"];
       render();
+
     } catch (e) {
-      alert(`Ошибка: ${e?.message || 'unknown'}`);
-      setPrimaryDisabled(false, state.editId ? "Сохранить" : "Завершить");
+      alert(`Ошибка: ${e?.message || "unknown"}`);
     } finally {
-      savingNow = false;
+      saving = false;
+      setPrimaryDisabled(false);
     }
   }
 
@@ -608,23 +609,24 @@
     if (!r) return;
 
     state = {
-      view:'comment',
+      view:"comment",
       manager: r.manager,
       restaurant: r.restaurant,
       reason: r.reason,
-      comment: r.comment || '',
+      comment: r.comment || "",
       start: JSON.parse(JSON.stringify(r.start)),
       end: JSON.parse(JSON.stringify(r.end)),
-      stage:'start',
+      stage:"start",
       amount: r.amount || 0,
       filter: state.filter,
       analyticsCal: state.analyticsCal,
-      analyticsTab: state.analyticsTab || 'restaurants',
+      analyticsTab: state.analyticsTab || "restaurants",
       draftId: null,
-      editId: id
+      editId: id,
+      requestId: null
     };
 
-    historyStack = ['main','history','comment'];
+    historyStack = ["main","history","comment"];
     render();
   }
 
@@ -641,25 +643,26 @@
 
   function startFlow() {
     state = {
-      view:'managers',
-      manager:'', restaurant:'', reason:'', comment:'',
+      view:"managers",
+      manager:"", restaurant:"", reason:"", comment:"",
       start:getNowObj(),
       end:getNowObj(),
-      stage:'start',
+      stage:"start",
       amount:0,
       filter: state.filter,
       analyticsCal: state.analyticsCal,
-      analyticsTab: 'restaurants',
+      analyticsTab: "restaurants",
       draftId: null,
-      editId: null
+      editId: null,
+      requestId: null
     };
-    navigate('managers');
+    navigate("managers");
   }
 
   function navigate(v){ historyStack.push(v); state.view=v; render(); }
   function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
-  function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
-  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
+  function setDay(d){ if(state.stage==="start") state.start.day=d; else state.end.day=d; render(); }
+  function updateFlowDate(p,v){ const cur=state.stage==="start"?state.start:state.end; cur[p]=parseInt(v); render(); }
 
   function setAnalyticsDate(ts){
     if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
@@ -680,9 +683,9 @@
 
   function scaleSumInput(input){
     const val=input.value;
-    if(val.length>7) input.style.fontSize='32px';
-    else if(val.length>5) input.style.fontSize='44px';
-    else input.style.fontSize='60px';
+    if(val.length>7) input.style.fontSize="32px";
+    else if(val.length>5) input.style.fontSize="44px";
+    else input.style.fontSize="60px";
   }
 
   function filterAnalytics(reports){
@@ -692,15 +695,15 @@
     return reports.filter(r => {
       const ts = r.start?.ts || r.created_at || 0;
 
-      if(state.filter==='today') return ts >= startOfToday;
+      if(state.filter==="today") return ts >= startOfToday;
 
-      if(state.filter==='week') {
+      if(state.filter==="week") {
         const dow = (now.getDay() || 7) - 1;
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
 
-      if(state.filter==='custom') {
+      if(state.filter==="custom") {
         if (!state.analyticsCal.start || !state.analyticsCal.end) return true;
         return ts >= state.analyticsCal.start && ts <= (state.analyticsCal.end + 86400000);
       }
@@ -711,15 +714,15 @@
 
   function initWheels(t){
     setTimeout(() => {
-      const h=document.getElementById('h-w'), m=document.getElementById('m-w');
+      const h=document.getElementById("h-w"), m=document.getElementById("m-w");
       if(!h || !m) return;
-      h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
-      m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
+      h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join("");
+      m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join("");
       h.scrollTop=t.hour*52; m.scrollTop=t.min*52;
 
       const sync=(el)=>{
         const idx=Math.round(el.scrollTop/52);
-        el.querySelectorAll('.wheel-item').forEach((it,i)=>it.classList.toggle('active', i===idx));
+        el.querySelectorAll(".wheel-item").forEach((it,i)=>it.classList.toggle("active", i===idx));
       };
       h.onscroll=()=>sync(h); m.onscroll=()=>sync(m);
       sync(h); sync(m);
@@ -727,11 +730,11 @@
   }
 
   function getWheels(){
-    const h=document.getElementById('h-w'), m=document.getElementById('m-w');
+    const h=document.getElementById("h-w"), m=document.getElementById("m-w");
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  window.addEventListener('load', async () => {
+  window.addEventListener("load", async () => {
     try {
       await loadReportsFromServer();
     } catch (e) {
