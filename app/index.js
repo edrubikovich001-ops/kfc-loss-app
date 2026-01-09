@@ -18,36 +18,18 @@ const publicDir = path.join(__dirname, "..", "public");
 app.use(express.static(publicDir));
 
 /**
- * ENV
- * DATABASE_URL  - строка подключения Supabase Postgres (Session pooler, IPv4 compatible)
- * BOT_TOKEN     - телеграм бот токен (опционально)
- * TG_CHAT_ID    - chat_id куда слать (опционально)
+ * ENV (Render -> Environment Variables):
+ * DATABASE_URL  - Supabase Session Pooler URL (IPv4 compatible)
+ * BOT_TOKEN     - Telegram bot token (optional)
+ * TG_CHAT_ID    - chat_id (optional)
  */
-const DATABASE_URL = process.env.DATABASE_URL || "";
-const BOT_TOKEN = process.env.BOT_TOKEN || "";
-const TG_CHAT_ID = process.env.TG_CHAT_ID || "";
+const DATABASE_URL = process.env.DATABASE_URL;
 
-// --- helpers ---
-function needsSsl(url = "") {
-  return url && !url.includes("localhost") && !url.includes("127.0.0.1");
-}
+let dbReady = false;
+let dbError = null;
 
-function normalizeDbUrl(url = "") {
-  if (!url) return url;
-  if (url.includes("sslmode=")) return url;
-  return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
-}
-
-const pool = new Pool({
-  connectionString: normalizeDbUrl(DATABASE_URL),
-  ssl: needsSsl(DATABASE_URL) ? { rejectUnauthorized: false } : false,
-  max: 5,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000
-});
-
-async function q(text, params) {
-  return pool.query(text, params);
+function safeStr(v) {
+  return (v ?? "").toString();
 }
 
 function parseRuDT(s) {
@@ -55,11 +37,7 @@ function parseRuDT(s) {
   if (!s || typeof s !== "string") return null;
   const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!m) return null;
-  const dd = Number(m[1]),
-    mm = Number(m[2]) - 1,
-    yy = Number(m[3]),
-    hh = Number(m[4]),
-    mi = Number(m[5]);
+  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
   const d = new Date(yy, mm, dd, hh, mi);
   if (Number.isNaN(d.getTime())) return null;
   return d;
@@ -73,8 +51,32 @@ function hoursDiff(startStr, endStr) {
   return Math.round(diff * 100) / 100;
 }
 
-let dbReady = false;
-let dbError = "";
+let pool = null;
+
+function buildPool() {
+  if (!DATABASE_URL) {
+    dbReady = false;
+    dbError = "DATABASE_URL is missing";
+    return null;
+  }
+
+  // ВАЖНО:
+  // Supabase pooler часто отдаёт цепочку сертификатов, которую Node считает "self-signed".
+  // Решение: ssl.rejectUnauthorized=false (это нормальная практика для Supabase pooler на хостингах).
+  // НИКАКОГО NODE_TLS_REJECT_UNAUTHORIZED=0 не нужно.
+  return new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 15_000
+  });
+}
+
+async function q(text, params) {
+  if (!pool) throw new Error("DB pool not initialized");
+  return pool.query(text, params);
+}
 
 async function ensureSchema() {
   await q(`
@@ -94,35 +96,27 @@ async function ensureSchema() {
 }
 
 async function initDb() {
-  if (!DATABASE_URL) {
-    dbReady = false;
-    dbError = "DATABASE_URL is missing";
-    console.error("DB init failed:", dbError);
-    return;
-  }
-
   try {
+    pool = buildPool();
+    if (!pool) throw new Error(dbError || "No pool");
+    await q("SELECT 1 as ok");
     await ensureSchema();
     dbReady = true;
-    dbError = "";
-    console.log("DB ready ✅");
+    dbError = null;
   } catch (e) {
     dbReady = false;
-    dbError = e?.message || "unknown db error";
+    dbError = e?.message || String(e);
     console.error("DB init failed:", dbError);
   }
 }
 
-// инициализация БД НЕ должна валить весь сервер
+// стартуем без падения сайта
 await initDb();
 
 // health
 app.get("/api/health", async (req, res) => {
   try {
-    // если dbReady false — всё равно вернём статус, чтобы ты видел причину
-    if (!dbReady) {
-      return res.status(200).json({ ok: false, dbReady: false, error: dbError || "db not ready" });
-    }
+    if (!pool) return res.status(200).json({ ok: false, dbReady, error: dbError || "No DATABASE_URL" });
     await q("SELECT 1 as ok");
     res.json({ ok: true, dbReady: true });
   } catch (e) {
@@ -141,7 +135,7 @@ app.get("/api/reports", async (req, res) => {
   }
 });
 
-// create (с защитой от дубля по request_id)
+// create (анти-дубль по request_id)
 app.post("/api/reports", async (req, res) => {
   try {
     if (!dbReady) return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
@@ -157,7 +151,7 @@ app.post("/api/reports", async (req, res) => {
     }
 
     const created_at = Date.now();
-    const rid = (request_id && String(request_id).trim()) || crypto.randomUUID();
+    const rid = (request_id && safeStr(request_id).trim()) || crypto.randomUUID();
 
     await q(
       `
@@ -167,12 +161,12 @@ app.post("/api/reports", async (req, res) => {
       `,
       [
         rid,
-        String(manager).trim(),
-        String(restaurant).trim(),
-        String(reason).trim(),
-        comment ? String(comment) : "",
-        start ? String(start) : "",
-        end ? String(end) : "",
+        safeStr(manager).trim(),
+        safeStr(restaurant).trim(),
+        safeStr(reason).trim(),
+        comment ? safeStr(comment) : "",
+        start ? safeStr(start) : "",
+        end ? safeStr(end) : "",
         Math.round(nAmount),
         created_at
       ]
@@ -181,6 +175,9 @@ app.post("/api/reports", async (req, res) => {
     const row = (await q(`SELECT * FROM reports WHERE request_id=$1`, [rid])).rows[0];
 
     // Telegram (опционально)
+    const BOT_TOKEN = process.env.BOT_TOKEN;
+    const TG_CHAT_ID = process.env.TG_CHAT_ID;
+
     if (BOT_TOKEN && TG_CHAT_ID && row) {
       const text =
         `🚨 ОТЧЕТ ПО ПОТЕРЯМ\n\n` +
@@ -193,11 +190,12 @@ app.post("/api/reports", async (req, res) => {
         `💬 Комментарий: ${row.comment || "-"}`;
 
       try {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: TG_CHAT_ID, text })
         });
+        await tgResp.json().catch(() => ({}));
       } catch (_) {}
     }
 
@@ -236,13 +234,13 @@ app.put("/api/reports/:id", async (req, res) => {
       RETURNING *
       `,
       [
-        String(manager).trim(),
-        String(restaurant).trim(),
-        String(reason).trim(),
+        safeStr(manager).trim(),
+        safeStr(restaurant).trim(),
+        safeStr(reason).trim(),
         Math.round(nAmount),
-        start ? String(start) : "",
-        end ? String(end) : "",
-        comment ? String(comment) : "",
+        start ? safeStr(start) : "",
+        end ? safeStr(end) : "",
+        comment ? safeStr(comment) : "",
         id
       ]
     );
@@ -268,7 +266,7 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel — ТУ-ресторан-Причина-Комментарий-Начало-Конец-Длительность-Сумма(₸)
+// export excel (серверный) — нужные колонки + формат ₸
 app.get("/api/export.xlsx", async (req, res) => {
   try {
     if (!dbReady) return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
@@ -288,19 +286,7 @@ app.get("/api/export.xlsx", async (req, res) => {
 
     const ws = XLSX.utils.json_to_sheet(data);
 
-    // ширины колонок
-    ws["!cols"] = [
-      { wch: 22 }, // ТУ
-      { wch: 28 }, // Ресторан
-      { wch: 22 }, // Причина
-      { wch: 40 }, // Комментарий
-      { wch: 20 }, // Начало
-      { wch: 20 }, // Конец
-      { wch: 18 }, // Длительность
-      { wch: 18 }  // Сумма
-    ];
-
-    // Формат суммы ₸ (колонка 7, индекс 7)
+    // Формат суммы: колонка "Сумма потерь" = последняя (индекс 7)
     if (ws["!ref"]) {
       const range = XLSX.utils.decode_range(ws["!ref"]);
       for (let R = range.s.r + 1; R <= range.e.r; R++) {
@@ -311,6 +297,18 @@ app.get("/api/export.xlsx", async (req, res) => {
         }
       }
     }
+
+    // ширины колонок
+    ws["!cols"] = [
+      { wch: 22 }, // ТУ
+      { wch: 34 }, // Ресторан
+      { wch: 22 }, // Причина
+      { wch: 46 }, // Комментарий
+      { wch: 20 }, // Начало
+      { wch: 20 }, // Конец
+      { wch: 18 }, // Длительность
+      { wch: 18 }  // Сумма
+    ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Loss");
@@ -324,6 +322,12 @@ app.get("/api/export.xlsx", async (req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "unknown" });
   }
+});
+
+// если база поднялась позже — можно дернуть /api/health, и сделать реинициализацию
+app.post("/api/reinit-db", async (req, res) => {
+  await initDb();
+  res.json({ ok: dbReady, dbReady, error: dbError });
 });
 
 // Telegram WebApp может приходить с любыми путями — отдаём index.html
