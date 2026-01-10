@@ -14,7 +14,6 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
     :root { --ios-blue:#0A84FF; --kfc-red:#E4002B; --item-height:52px; }
 
-    /* ===== PREMIUM LIVE BACKGROUND (Aurora/Mesh) ===== */
     html, body { height: 100%; }
     body{
       font-family:'Inter',-apple-system,sans-serif;
@@ -26,7 +25,7 @@
       user-select:none;
     }
 
-    /* Фиксированный фон за приложением */
+    /* ===== LIVE BACKGROUND (FORCED VISIBILITY) ===== */
     #bg-wrap{
       position: fixed;
       inset: 0;
@@ -35,95 +34,98 @@
       background: #000;
     }
 
-    /* Мягкая "аура" — несколько радиальных градиентов */
+    /* Слой 1: крупные мягкие пятна */
     #bg-aurora{
       position:absolute;
-      inset:-30%;
-      filter: blur(70px);
-      opacity: 0.85;
+      inset:-35%;
+      filter: blur(75px);
+      opacity: 0.95;
       transform: translate3d(0,0,0);
       will-change: transform;
       background:
-        radial-gradient(closest-side at 20% 30%, rgba(228, 0, 43, 0.55), transparent 60%),
-        radial-gradient(closest-side at 70% 20%, rgba(124, 58, 237, 0.45), transparent 62%),
-        radial-gradient(closest-side at 75% 75%, rgba(10, 132, 255, 0.35), transparent 65%),
-        radial-gradient(closest-side at 25% 80%, rgba(228, 0, 43, 0.28), transparent 60%);
-      animation: auroraMove 26s ease-in-out infinite;
+        radial-gradient(closest-side at 20% 30%, rgba(228, 0, 43, 0.62), transparent 62%),
+        radial-gradient(closest-side at 70% 20%, rgba(124, 58, 237, 0.50), transparent 64%),
+        radial-gradient(closest-side at 78% 78%, rgba(10, 132, 255, 0.42), transparent 68%),
+        radial-gradient(closest-side at 22% 84%, rgba(228, 0, 43, 0.35), transparent 62%);
+      animation: auroraMove 24s ease-in-out infinite;
     }
 
-    /* Второй слой для глубины (другая скорость/траектория) */
+    /* Слой 2: глубина */
     #bg-aurora2{
       position:absolute;
-      inset:-35%;
-      filter: blur(85px);
-      opacity: 0.55;
+      inset:-40%;
+      filter: blur(95px);
+      opacity: 0.65;
       transform: translate3d(0,0,0);
       will-change: transform;
       background:
-        radial-gradient(closest-side at 35% 40%, rgba(228, 0, 43, 0.35), transparent 62%),
-        radial-gradient(closest-side at 60% 55%, rgba(124, 58, 237, 0.32), transparent 65%),
-        radial-gradient(closest-side at 50% 90%, rgba(10, 132, 255, 0.22), transparent 68%);
+        radial-gradient(closest-side at 35% 40%, rgba(228, 0, 43, 0.40), transparent 64%),
+        radial-gradient(closest-side at 62% 55%, rgba(124, 58, 237, 0.38), transparent 68%),
+        radial-gradient(closest-side at 50% 92%, rgba(10, 132, 255, 0.28), transparent 70%);
       mix-blend-mode: screen;
-      animation: auroraMove2 34s ease-in-out infinite;
+      animation: auroraMove2 32s ease-in-out infinite;
     }
 
-    /* Виньетка + затемнение по краям (как в дорогих UI) */
-    #bg-vignette{
+    /* Слой 3: лёгкий "glow" по центру — чтобы фон был виден даже при плотном UI */
+    #bg-glow{
       position:absolute;
       inset:0;
       background:
-        radial-gradient(1200px 900px at 50% 35%, rgba(0,0,0,0.10), rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.92) 100%),
-        linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0.85));
+        radial-gradient(900px 700px at 50% 45%, rgba(228,0,43,0.16), transparent 60%),
+        radial-gradient(900px 700px at 60% 55%, rgba(124,58,237,0.14), transparent 62%),
+        radial-gradient(900px 700px at 40% 60%, rgba(10,132,255,0.10), transparent 64%);
+      opacity: 0.95;
+      animation: breathe 9s ease-in-out infinite;
       pointer-events:none;
     }
 
-    /* Лёгкий "noise" — чтобы фон выглядел не плоско */
+    /* Noise */
     #bg-noise{
       position:absolute;
       inset:0;
-      opacity:0.08;
+      opacity:0.10;
       pointer-events:none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
       background-size: 220px 220px;
       mix-blend-mode: overlay;
     }
 
-    /* Очень мягкое "дыхание" контраста */
-    #bg-breathe{
+    /* Виньетка */
+    #bg-vignette{
       position:absolute;
       inset:0;
-      background: radial-gradient(900px 700px at 50% 45%, rgba(255,255,255,0.04), transparent 60%);
-      opacity: 0.7;
-      animation: breathe 10s ease-in-out infinite;
+      background:
+        radial-gradient(1200px 900px at 50% 35%, rgba(0,0,0,0.05), rgba(0,0,0,0.72) 60%, rgba(0,0,0,0.92) 100%),
+        linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0.85));
       pointer-events:none;
     }
 
     @keyframes auroraMove {
-      0%   { transform: translate3d(-2%, -1%, 0) scale(1.05) rotate(0deg); }
-      25%  { transform: translate3d(3%, -2%, 0) scale(1.08) rotate(6deg); }
-      50%  { transform: translate3d(4%, 3%, 0) scale(1.06) rotate(0deg); }
-      75%  { transform: translate3d(-3%, 4%, 0) scale(1.09) rotate(-7deg); }
-      100% { transform: translate3d(-2%, -1%, 0) scale(1.05) rotate(0deg); }
+      0%   { transform: translate3d(-2%, -1%, 0) scale(1.06) rotate(0deg); }
+      25%  { transform: translate3d(4%, -2%, 0) scale(1.10) rotate(6deg); }
+      50%  { transform: translate3d(5%, 3%, 0) scale(1.08) rotate(0deg); }
+      75%  { transform: translate3d(-4%, 4%, 0) scale(1.11) rotate(-7deg); }
+      100% { transform: translate3d(-2%, -1%, 0) scale(1.06) rotate(0deg); }
     }
 
     @keyframes auroraMove2 {
-      0%   { transform: translate3d(2%, 2%, 0) scale(1.10) rotate(0deg); }
-      25%  { transform: translate3d(-3%, 3%, 0) scale(1.06) rotate(-6deg); }
-      50%  { transform: translate3d(-4%, -2%, 0) scale(1.12) rotate(0deg); }
-      75%  { transform: translate3d(3%, -4%, 0) scale(1.07) rotate(7deg); }
-      100% { transform: translate3d(2%, 2%, 0) scale(1.10) rotate(0deg); }
+      0%   { transform: translate3d(2%, 2%, 0) scale(1.12) rotate(0deg); }
+      25%  { transform: translate3d(-4%, 3%, 0) scale(1.07) rotate(-6deg); }
+      50%  { transform: translate3d(-5%, -2%, 0) scale(1.14) rotate(0deg); }
+      75%  { transform: translate3d(4%, -5%, 0) scale(1.08) rotate(7deg); }
+      100% { transform: translate3d(2%, 2%, 0) scale(1.12) rotate(0deg); }
     }
 
     @keyframes breathe {
-      0%,100% { opacity: 0.55; }
-      50%     { opacity: 0.85; }
+      0%,100% { opacity: 0.70; }
+      50%     { opacity: 1.00; }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      #bg-aurora, #bg-aurora2, #bg-breathe { animation: none !important; }
+      #bg-aurora, #bg-aurora2, #bg-glow { animation: none !important; }
     }
 
-    /* ===== UI STYLES ===== */
+    /* ===== UI ===== */
     .ios-card{ background:#1C1C1E;border-radius:16px;border:1px solid rgba(255,255,255,.08);}
     .wheel-box{display:flex;align-items:center;background:#2C2C2E;border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.1);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
@@ -143,11 +145,9 @@
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
     main::-webkit-scrollbar{display:none;}
 
-    /* Важно: делаем оболочку не “глухо чёрной”, чтобы фон был виден */
+    /* Ключевое: оболочка должна быть ПРОЗРАЧНОЙ, иначе фон не видно */
     .app-shell{
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      background: transparent;
     }
   </style>
 </head>
@@ -157,14 +157,14 @@
   <div id="bg-wrap" aria-hidden="true">
     <div id="bg-aurora"></div>
     <div id="bg-aurora2"></div>
-    <div id="bg-breathe"></div>
+    <div id="bg-glow"></div>
     <div id="bg-noise"></div>
     <div id="bg-vignette"></div>
   </div>
 
   <!-- APP -->
   <div class="max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden app-shell" style="z-index:1;">
-    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/55 backdrop-blur-md z-50">
+    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/35 backdrop-blur-md z-50">
       <div class="flex items-center gap-4">
         <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5">
           <i data-lucide="chevron-left" class="text-blue-500"></i>
@@ -175,14 +175,14 @@
         </div>
       </div>
 
-      <button onclick="refreshFromServer()" class="text-gray-300/60 active:scale-90 transition-transform" title="Обновить">
+      <button onclick="refreshFromServer()" class="text-gray-300/70 active:scale-90 transition-transform" title="Обновить">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
     </header>
 
     <main id="view-container" class="flex-1 overflow-y-auto px-6 py-6 pb-48"></main>
 
-    <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/65 backdrop-blur-xl border-t border-white/5">
+    <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/35 backdrop-blur-xl border-t border-white/5">
       <div class="flex flex-col gap-3">
         <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white">Завершить позже</button>
         <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-all uppercase tracking-tight shadow-2xl">Далее</button>
@@ -194,10 +194,8 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
-  // ПУТИ API
   const API = "/api";
 
-  // ДАННЫЕ
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
@@ -216,7 +214,6 @@
     "Alyona Rainskaya": ["12741 KFC Baizar Mall","12714-KFC Essentai Mall","12750-KFC Alem Plaza","12757-KFC Neftek","12768-KFC KazGu Almaty","12806-KFC NASIKHA ATYRAU","12815-KFC INFINITY MALL ATYRAU"]
   };
 
-  // LocalStorage: только черновики
   const STORAGE_KEY = 'kfc_loss_pro_v9';
 
   let db = { reports: [], drafts: [] };
@@ -239,7 +236,6 @@
   }
 
   function parseRuDateTime(str) {
-    // "dd.mm.yyyy hh:mm"
     if (!str || typeof str !== "string") return null;
     const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
     if (!m) return null;
@@ -277,12 +273,9 @@
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
-  // безопасный popup (на iOS бывает webAppPopupOpened)
   function safePopup(title, message) {
     if (!tg || typeof tg.showPopup !== "function") return;
-    try {
-      tg.showPopup({ title, message, buttons: [{ type: "ok" }] });
-    } catch (_) {}
+    try { tg.showPopup({ title, message, buttons: [{ type: "ok" }] }); } catch (_) {}
   }
 
   async function refreshFromServer() {
@@ -295,7 +288,6 @@
     }
   }
 
-  // STATE
   let state = {
     view: 'main',
     manager: '', restaurant: '', reason: '', comment: '',
@@ -383,7 +375,6 @@
 
     else if (state.view === 'reasons') {
       title.innerText = "Причина";
-      // Последовательность как ты просил:
       ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
@@ -443,7 +434,7 @@
       const btn = document.getElementById('primary-btn');
       btn.disabled = false;
       btn.classList.remove('opacity-50','pointer-events-none');
-      btn.innerText = isStart ? "Установить конец" : (state.editId ? "Далее" : "Далее");
+      btn.innerText = isStart ? "Установить конец" : "Далее";
       btn.onclick = () => {
         const v = getWheels();
         if (isStart) {
@@ -556,7 +547,7 @@
           </button>
         </div>
 
-        <div class="flex border-b border-white/5 mb-6 sticky top-0 bg-black/40 backdrop-blur-md z-10">
+        <div class="flex border-b border-white/5 mb-6 sticky top-0 bg-black/20 backdrop-blur-md z-10">
           <button onclick="state.analyticsTab='restaurants';render()" class="tab-btn ${state.analyticsTab==='restaurants'?'active':''}">Рестораны</button>
           <button onclick="state.analyticsTab='reasons';render()" class="tab-btn ${state.analyticsTab==='reasons'?'active':''}">Причины</button>
         </div>
@@ -817,7 +808,7 @@
       if(state.filter==='today') return ts >= startOfToday;
 
       if(state.filter==='week') {
-        const dow = (now.getDay() || 7) - 1; // 0..6
+        const dow = (now.getDay() || 7) - 1;
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
