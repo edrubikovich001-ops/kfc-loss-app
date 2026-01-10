@@ -25,8 +25,8 @@
       /* Автоволна (всегда) */
       --ax: 0px;
       --ay: 0px;
-      --aw: 0.12;   /* wave intensity */
-      --shine: 0.14;/* wave brightness */
+      --aw: 0.12;
+      --shine: 0.14;
 
       /* Spotlight */
       --sx: 50%;
@@ -42,7 +42,7 @@
     html,body{height:100%;}
     body{
       font-family:'Inter',-apple-system,sans-serif;
-      background:#000;
+      background:#06080d; /* чуть светлее базу, чтобы фон не “проваливался” */
       color:#fff;
       margin:0;
       overflow:hidden;
@@ -50,15 +50,16 @@
       user-select:none;
     }
 
-    /* ===== ДИНАМИЧНЫЙ ФОН (всегда “живой”) ===== */
+    /* ===== ДИНАМИЧНЫЙ ФОН (слегка осветлён) ===== */
     #bg{
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
       background:
-        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.20), transparent 60%),
-        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.20), transparent 60%),
-        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.16), transparent 60%),
-        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.20), transparent 60%),
-        linear-gradient(180deg, rgba(0,0,0,.50), rgba(0,0,0,.80));
+        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.28), transparent 62%),
+        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.26), transparent 62%),
+        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.22), transparent 62%),
+        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.26), transparent 62%),
+        /* было темнее: (0,0,0,.50)->(0,0,0,.80), делаем мягче */
+        linear-gradient(180deg, rgba(0,0,0,.32), rgba(0,0,0,.62));
     }
 
     #bg::before, #bg::after{
@@ -66,17 +67,16 @@
       position:absolute;
       inset:-30%;
       background:
-        radial-gradient(closest-side at 22% 34%, rgba(42,109,187,.38), transparent 55%),
-        radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.36), transparent 55%),
-        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.30), transparent 58%),
-        radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.36), transparent 58%);
-      filter: blur(20px) saturate(130%);
+        radial-gradient(closest-side at 22% 34%, rgba(42,109,187,.44), transparent 56%),
+        radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.42), transparent 56%),
+        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.36), transparent 59%),
+        radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.42), transparent 59%);
+      filter: blur(19px) saturate(138%);
       opacity: .98;
       will-change: transform, filter, opacity;
       transform: translate3d(0,0,0);
     }
 
-    /* Слой 1: сильнее и быстрее */
     #bg::before{
       mix-blend-mode: screen;
       animation: auroraFlowA 7.6s ease-in-out infinite;
@@ -89,10 +89,9 @@
         scale(1.03);
     }
 
-    /* Слой 2: мягче, глубже */
     #bg::after{
-      opacity:.78;
-      filter: blur(32px) saturate(140%);
+      opacity:.82; /* чуть ярче */
+      filter: blur(30px) saturate(150%);
       mix-blend-mode: screen;
       animation: auroraFlowB 10.5s ease-in-out infinite;
       transform:
@@ -104,17 +103,16 @@
         scale(1.05);
     }
 
-    /* Волнообразная яркость */
     #bg-pulse{
       position:fixed; inset:-15%; z-index:2; pointer-events:none;
       background:
-        radial-gradient(700px 520px at 30% 30%, rgba(255,255,255,.14), transparent 60%),
-        radial-gradient(820px 600px at 70% 35%, rgba(120,170,255,.16), transparent 62%),
-        radial-gradient(920px 700px at 60% 80%, rgba(255,42,74,.10), transparent 65%);
+        radial-gradient(700px 520px at 30% 30%, rgba(255,255,255,.16), transparent 60%),
+        radial-gradient(820px 600px at 70% 35%, rgba(120,170,255,.18), transparent 62%),
+        radial-gradient(920px 700px at 60% 80%, rgba(255,42,74,.12), transparent 65%);
       mix-blend-mode: screen;
       filter: blur(10px);
       will-change: transform, opacity;
-      opacity: calc(0.10 + var(--shine));
+      opacity: calc(0.12 + var(--shine)); /* чуть ярче */
       animation: pulseWave 4.2s ease-in-out infinite;
       transform:
         translate3d(
@@ -124,26 +122,18 @@
         );
     }
 
-    /* =========================
-       ПОЛОСКИ: медленнее + плавнее + больше шаг + волнистые
-       ========================= */
     #bg-lines{
       position:fixed; inset:0; z-index:1; pointer-events:none;
-
-      /* заметно, но без “ребита” */
-      opacity:.24;
-
-      /* больше расстояние между линиями */
+      opacity:.22; /* немного мягче, но заметно */
       background:
         repeating-linear-gradient(
           135deg,
-          rgba(255,255,255,.20) 0px,
-          rgba(255,255,255,.20) 1px,
+          rgba(255,255,255,.18) 0px,
+          rgba(255,255,255,.18) 1px,
           transparent 1px,
           transparent 34px
         );
 
-      /* волнистость через шумовую маску */
       -webkit-mask-image:
         radial-gradient(820px 820px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0)),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='18'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
@@ -160,8 +150,6 @@
 
       will-change: transform, opacity, filter, background-position, -webkit-mask-position, mask-position;
       mix-blend-mode: overlay;
-
-      /* в 2–3 раза медленнее и мягче */
       animation: linesWaveSlow 6.8s ease-in-out infinite;
 
       transform:
@@ -174,21 +162,21 @@
 
     @keyframes linesWaveSlow{
       0%{
-        opacity:.20;
+        opacity:.18;
         filter: blur(0px) brightness(1.02);
         background-position: 0% 54%;
         -webkit-mask-position: center, 0px 0px;
         mask-position: center, 0px 0px;
       }
       50%{
-        opacity:.30;
-        filter: blur(.35px) brightness(1.14);
+        opacity:.28;
+        filter: blur(.35px) brightness(1.12);
         background-position: 100% 46%;
         -webkit-mask-position: center, 60px -40px;
         mask-position: center, 60px -40px;
       }
       100%{
-        opacity:.22;
+        opacity:.20;
         filter: blur(0px) brightness(1.04);
         background-position: 0% 54%;
         -webkit-mask-position: center, 0px 0px;
@@ -198,7 +186,7 @@
 
     #bg-noise{
       position:fixed; inset:0; z-index:2; pointer-events:none;
-      opacity:.08;
+      opacity:.07;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='https://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
       mix-blend-mode: overlay;
       will-change: transform, opacity;
@@ -207,14 +195,14 @@
     }
 
     @keyframes auroraFlowA{
-      0%   { filter: blur(19px) saturate(130%); opacity:.92; }
-      50%  { filter: blur(22px) saturate(155%); opacity:1; }
-      100% { filter: blur(19px) saturate(140%); opacity:.95; }
+      0%   { filter: blur(18px) saturate(135%); opacity:.92; }
+      50%  { filter: blur(22px) saturate(165%); opacity:1; }
+      100% { filter: blur(18px) saturate(145%); opacity:.95; }
     }
     @keyframes auroraFlowB{
-      0%   { filter: blur(32px) saturate(140%); opacity:.70; }
-      50%  { filter: blur(38px) saturate(165%); opacity:.92; }
-      100% { filter: blur(32px) saturate(150%); opacity:.74; }
+      0%   { filter: blur(30px) saturate(150%); opacity:.72; }
+      50%  { filter: blur(38px) saturate(175%); opacity:.94; }
+      100% { filter: blur(30px) saturate(158%); opacity:.76; }
     }
     @keyframes pulseWave{
       0%   { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 - 10px), calc(var(--py) * 0.50 + var(--ay) * 1.10 + 8px), 0) scale(1.02); }
@@ -262,6 +250,82 @@
       -webkit-text-stroke: 0.25px rgba(255,255,255,.08);
     }
     @keyframes shimmer{ 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+
+    /* ===== iOS Liquid Glass Header (НОВОЕ) ===== */
+    .header-glass{
+      background: rgba(10,10,12,.30);
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow:
+        0 18px 50px rgba(0,0,0,.35),
+        inset 0 1px 0 rgba(255,255,255,.10);
+      backdrop-filter: blur(18px) saturate(160%) contrast(105%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%) contrast(105%);
+    }
+    .header-glass::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      pointer-events:none;
+      background:
+        radial-gradient(520px 260px at 18% 10%, rgba(255,255,255,.14), transparent 62%),
+        radial-gradient(520px 260px at 84% 30%, rgba(120,170,255,.12), transparent 66%),
+        radial-gradient(520px 260px at 56% 110%, rgba(255,42,74,.07), transparent 68%);
+      mix-blend-mode: screen;
+      opacity:.85;
+      filter: blur(10px);
+    }
+    .brand-pill{
+      position:relative;
+      padding:10px 14px;
+      border-radius:16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow:
+        0 12px 30px rgba(0,0,0,.30),
+        inset 0 1px 0 rgba(255,255,255,.10);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      overflow:hidden;
+    }
+    .brand-pill::before{
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background:
+        radial-gradient(closest-side at 30% 30%, rgba(255,255,255,.22), transparent 60%),
+        radial-gradient(closest-side at 70% 40%, rgba(120,170,255,.16), transparent 65%);
+      opacity:.55;
+      transform: translate3d(calc(var(--px) * 0.20 + var(--ax) * 0.12), calc(var(--py) * 0.20 + var(--ay) * 0.12), 0);
+      mix-blend-mode: screen;
+      filter: blur(8px);
+      pointer-events:none;
+    }
+    .brand-pill::after{
+      content:"";
+      position:absolute;
+      left:-60%;
+      top:-30%;
+      width:60%;
+      height:160%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+      transform: skewX(-18deg);
+      opacity:1;
+      animation: brandShine 5.8s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes brandShine{
+      0%{ left:-70%; opacity:.0; }
+      15%{ opacity:.65; }
+      45%{ opacity:.12; }
+      100%{ left:140%; opacity:.0; }
+    }
+    .brand-title{
+      line-height:1;
+      letter-spacing:-0.06em;
+      font-weight:900;
+      font-size:22px;
+      text-transform:uppercase;
+    }
 
     /* ===== Карточки + glow + border ===== */
     .ios-card{
@@ -393,7 +457,7 @@
     /* ===== ВАЖНО: быстрый и плавный скролл ===== */
     main{
       scroll-behavior: smooth;
-      -webkit-overflow-scrolling: touch; /* iOS быстрый */
+      -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scroll-snap-type: none;
     }
@@ -492,14 +556,15 @@
   <div id="toast"></div>
 
   <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
-    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/30 backdrop-blur-md z-50">
+    <!-- HEADER: сделал как iOS Liquid Glass -->
+    <header class="header-glass pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 z-50 relative">
       <div class="flex items-center gap-4">
         <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid">
           <i data-lucide="chevron-left" class="text-blue-400"></i>
         </button>
 
-        <div class="flex flex-col">
-          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">KFC</h1>
+        <div class="brand-pill flex flex-col">
+          <h1 id="header-title" class="brand-title glass-shimmer">KFC</h1>
           <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:#ff2a4a;">LOSS CONTROL</p>
         </div>
       </div>
@@ -598,7 +663,7 @@
     toast._t = setTimeout(()=>el.classList.remove('show'), 1400);
   }
 
-  /* ===== HAPTIC (WOW) ===== */
+  /* ===== HAPTIC ===== */
   const HAPTIC = tg?.HapticFeedback;
   let _hLast = 0;
   function hapticImpact(style="light"){
@@ -721,7 +786,7 @@
     scheduleRenderPreserveFocus(inputId, selStart, selEnd);
   }
 
-  /* ===== УСКОРЕНИЕ: lucide обновляем не на каждом шаге синхронно ===== */
+  /* ===== УСКОРЕНИЕ: lucide ===== */
   let _iconsScheduled = false;
   function scheduleIcons(){
     if(_iconsScheduled) return;
@@ -1331,7 +1396,7 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (WOW) ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА ===== */
   const rootStyle = document.documentElement.style;
   let pointerX = 0, pointerY = 0;
   let smoothX = 0, smoothY = 0;
@@ -1383,7 +1448,6 @@
   window.addEventListener('touchend', () => spotlightOff(), { passive:true });
   window.addEventListener('touchcancel', () => spotlightOff(), { passive:true });
 
-  /* Тактильность при скролле */
   let _scrollTick = 0;
   function bindScrollHaptics(){
     const main = document.getElementById('view-container');
@@ -1398,14 +1462,12 @@
     }, { passive:true });
   }
 
-  /* Автоволна фона */
   let _t0 = performance.now();
   function rafParallax(){
     const t = (performance.now() - _t0) / 1000;
 
     const ax = (Math.sin(t * 0.85) * 18 + Math.sin(t * 0.33) * 10);
     const ay = (Math.cos(t * 0.72) * 16 + Math.cos(t * 0.27) * 9);
-
     const shine = (Math.sin(t * 1.05) * 0.05 + Math.sin(t * 0.41) * 0.04);
 
     rootStyle.setProperty('--ax', ax.toFixed(2) + 'px');
