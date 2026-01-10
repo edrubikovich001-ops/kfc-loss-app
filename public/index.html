@@ -23,6 +23,11 @@
       --px: 0px;
       --py: 0px;
       --ps: 0px; /* scroll */
+
+      /* Прожектор */
+      --sx: 50%;
+      --sy: 45%;
+      --so: .0;  /* opacity */
     }
 
     html,body{height:100%;}
@@ -104,6 +109,24 @@
       animation: noiseMove 6s steps(6) infinite;
     }
 
+    /* ===== ПРОЖЕКТОР ПОД ПАЛЬЦЕМ ===== */
+    #spotlight{
+      position:fixed; inset:0; z-index:3; pointer-events:none;
+      opacity: var(--so);
+      transition: opacity .25s ease;
+      background:
+        radial-gradient(420px 420px at var(--sx) var(--sy),
+          rgba(255,255,255,.10),
+          rgba(160,205,255,.08) 18%,
+          rgba(255,255,255,.04) 35%,
+          rgba(0,0,0,0) 62%),
+        radial-gradient(820px 820px at var(--sx) var(--sy),
+          rgba(255,42,74,.06),
+          rgba(0,0,0,0) 70%);
+      mix-blend-mode: screen;
+      filter: blur(0.2px);
+    }
+
     @keyframes auroraMove{
       0%   { filter: blur(22px) saturate(120%); }
       50%  { filter: blur(24px) saturate(130%); }
@@ -168,7 +191,7 @@
       100%{ background-position: 0% 50%; }
     }
 
-    /* ===== КАРТОЧКИ: микро-анимации + glow ===== */
+    /* ===== КАРТОЧКИ: микро-анимации + glow + живой контур ===== */
     .ios-card{
       background:rgba(28,28,30,.82);
       border-radius:16px;
@@ -176,19 +199,59 @@
       backdrop-filter: blur(14px);
       position:relative;
       overflow:hidden;
+      isolation:isolate;
     }
+
+    /* Живой градиентный контур (очень тонко) */
+    .ios-card::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius:18px;
+      background: conic-gradient(
+        from 0deg,
+        rgba(255,255,255,.00),
+        rgba(120,170,255,.22),
+        rgba(255,42,74,.18),
+        rgba(180,120,255,.20),
+        rgba(255,255,255,.00)
+      );
+      opacity:.0;
+      filter: blur(.2px);
+      animation: ringSpin 6.5s linear infinite;
+      z-index:0;
+
+      /* Вырезаем середину, чтобы остался "ободок" */
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      padding:2px;
+      pointer-events:none;
+      transition: opacity .25s ease;
+    }
+
     .ios-card::after{
       content:"";
       position:absolute; inset:-2px;
       border-radius:18px;
-      background: radial-gradient(600px 220px at 20% 10%, rgba(255,255,255,.10), transparent 55%),
-                  radial-gradient(500px 260px at 85% 30%, rgba(120,170,255,.10), transparent 60%),
-                  radial-gradient(600px 260px at 55% 90%, rgba(255,42,74,.07), transparent 60%);
+      background:
+        radial-gradient(600px 220px at 20% 10%, rgba(255,255,255,.10), transparent 55%),
+        radial-gradient(500px 260px at 85% 30%, rgba(120,170,255,.10), transparent 60%),
+        radial-gradient(600px 260px at 55% 90%, rgba(255,42,74,.07), transparent 60%);
       opacity:0;
       transition: opacity .25s ease;
       pointer-events:none;
       mix-blend-mode: screen;
+      z-index:1;
     }
+
+    @keyframes ringSpin{
+      from{ transform: rotate(0deg); }
+      to{ transform: rotate(360deg); }
+    }
+
     .card-anim{
       transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
       box-shadow: 0 12px 30px rgba(0,0,0,.35);
@@ -199,11 +262,13 @@
       box-shadow: 0 18px 45px rgba(0,0,0,.45);
     }
     .card-anim:hover::after{ opacity:1; }
+    .card-anim:hover::before{ opacity:.55; } /* включаем живой контур при hover */
     .card-anim:active{
       transform: translateY(0px) scale(0.985);
       box-shadow: 0 10px 26px rgba(0,0,0,.35);
     }
     .card-anim:active::after{ opacity:.75; }
+    .card-anim:active::before{ opacity:.75; }
 
     /* ===== КНОПКИ "ЖИДКИЕ" ===== */
     .btn-liquid{
@@ -347,6 +412,7 @@
   <div id="bg"></div>
   <div id="bg-lines"></div>
   <div id="bg-noise"></div>
+  <div id="spotlight"></div>
 
   <div id="toast"></div>
 
@@ -1189,57 +1255,81 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  /* ===== ПАРАЛЛАКС: скролл + палец/мышь ===== */
+  /* ===== ПАРАЛЛАКС + ПРОЖЕКТОР ===== */
   const rootStyle = document.documentElement.style;
+
   let pointerX = 0, pointerY = 0;
   let smoothX = 0, smoothY = 0;
   let smoothS = 0;
 
-  function setParallaxFromPointer(clientX, clientY){
+  let spotX = 50, spotY = 45;
+  let sX = 50, sY = 45;
+  let spotOn = 0;
+  let spotTarget = 0;
+
+  function setFromPointer(clientX, clientY){
     const w = window.innerWidth || 1;
     const h = window.innerHeight || 1;
+
     const nx = (clientX / w - 0.5);
     const ny = (clientY / h - 0.5);
-    pointerX = nx * 22;  // px
-    pointerY = ny * 22;  // px
+
+    // параллакс
+    pointerX = nx * 22;
+    pointerY = ny * 22;
+
+    // прожектор (в процентах)
+    spotX = (clientX / w) * 100;
+    spotY = (clientY / h) * 100;
+    spotTarget = 1;
   }
 
-  function setParallaxFromScroll(){
+  function setFromScroll(){
     const main = document.getElementById('view-container');
     if(!main) return 0;
     const s = main.scrollTop || 0;
-    return -(s * 0.02); // subtle
+    return -(s * 0.02);
   }
 
-  function rafParallax(){
-    const targetS = setParallaxFromScroll();
+  function rafFX(){
+    const targetS = setFromScroll();
+
     smoothX += (pointerX - smoothX) * 0.10;
     smoothY += (pointerY - smoothY) * 0.10;
     smoothS += (targetS - smoothS) * 0.10;
+
+    // прожектор плавно
+    sX += (spotX - sX) * 0.12;
+    sY += (spotY - sY) * 0.12;
+
+    spotOn += (spotTarget - spotOn) * 0.10;
+    spotTarget *= 0.96; // затухание если нет движения
 
     rootStyle.setProperty('--px', smoothX.toFixed(2) + 'px');
     rootStyle.setProperty('--py', smoothY.toFixed(2) + 'px');
     rootStyle.setProperty('--ps', smoothS.toFixed(2) + 'px');
 
-    requestAnimationFrame(rafParallax);
+    rootStyle.setProperty('--sx', sX.toFixed(1) + '%');
+    rootStyle.setProperty('--sy', sY.toFixed(1) + '%');
+    rootStyle.setProperty('--so', Math.min(0.75, Math.max(0, spotOn * 0.75)).toFixed(3));
+
+    requestAnimationFrame(rafFX);
   }
 
-  window.addEventListener('mousemove', (e) => setParallaxFromPointer(e.clientX, e.clientY), { passive:true });
+  window.addEventListener('mousemove', (e) => setFromPointer(e.clientX, e.clientY), { passive:true });
+  window.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    if(t) setFromPointer(t.clientX, t.clientY);
+  }, { passive:true });
   window.addEventListener('touchmove', (e) => {
     const t = e.touches && e.touches[0];
-    if(t) setParallaxFromPointer(t.clientX, t.clientY);
+    if(t) setFromPointer(t.clientX, t.clientY);
   }, { passive:true });
 
   window.addEventListener('load', () => {
     try {
       render(); // UI сразу
-
-      const main = document.getElementById('view-container');
-      if(main){
-        main.addEventListener('scroll', () => {}, { passive:true });
-      }
-
-      requestAnimationFrame(rafParallax);
+      requestAnimationFrame(rafFX);
 
       toast("Загрузка...");
       loadReportsFromServer()
