@@ -47,7 +47,7 @@
     html,body{height:100%;}
     body{
       font-family:'Inter',-apple-system,sans-serif;
-      background:#070a10; /* ЧУТЬ СВЕТЛЕЕ */
+      background:#070a10;
       color:#fff;
       margin:0;
       overflow:hidden;
@@ -126,34 +126,42 @@
         );
     }
 
-    /* Полоски */
+    /* =========================
+       ПОЛОСКИ: чуть заметнее + чуть сильнее волнистость
+       ========================= */
     #bg-lines{
       position:fixed; inset:0; z-index:1; pointer-events:none;
-      opacity:.22;
+
+      /* БЫЛО: .22 -> СДЕЛАЛИ ЧУТЬ ЗАМЕТНЕЕ */
+      opacity:.30;
+
       background:
         repeating-linear-gradient(
           135deg,
-          rgba(255,255,255,.18) 0px,
-          rgba(255,255,255,.18) 1px,
+          rgba(255,255,255,.24) 0px,
+          rgba(255,255,255,.24) 1px,
           transparent 1px,
           transparent 34px
         );
+
+      /* волнистость через шумовую маску (scale 18 -> 22) */
       -webkit-mask-image:
         radial-gradient(820px 820px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='18'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='22'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
       -webkit-mask-size: auto, 520px 520px;
       -webkit-mask-repeat: no-repeat, repeat;
       -webkit-mask-position: center, 0 0;
 
       mask-image:
         radial-gradient(820px 820px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='18'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='22'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
       mask-size: auto, 520px 520px;
       mask-repeat: no-repeat, repeat;
       mask-position: center, 0 0;
 
       will-change: transform, opacity, filter, background-position, -webkit-mask-position, mask-position;
       mix-blend-mode: overlay;
+
       animation: linesWaveSlow 6.8s ease-in-out infinite;
 
       transform:
@@ -193,24 +201,26 @@
       0%{ transform: translate3d(calc(var(--ax) * 0.30), calc(var(--ay) * 0.30), 0); }
       100%{ transform: translate3d(calc(var(--ax) * 0.30 - 40px), calc(var(--ay) * 0.30 + 20px), 0); }
     }
+
+    /* БЫЛО: 0.18/0.28/0.20 -> чуть выше */
     @keyframes linesWaveSlow{
       0%{
-        opacity:.18;
-        filter: blur(0px) brightness(1.02);
+        opacity:.26;
+        filter: blur(0px) brightness(1.04);
         background-position: 0% 54%;
         -webkit-mask-position: center, 0px 0px;
         mask-position: center, 0px 0px;
       }
       50%{
-        opacity:.28;
-        filter: blur(.35px) brightness(1.12);
+        opacity:.38;
+        filter: blur(.40px) brightness(1.18);
         background-position: 100% 46%;
-        -webkit-mask-position: center, 60px -40px;
-        mask-position: center, 60px -40px;
+        -webkit-mask-position: center, 70px -46px;
+        mask-position: center, 70px -46px;
       }
       100%{
-        opacity:.20;
-        filter: blur(0px) brightness(1.04);
+        opacity:.28;
+        filter: blur(0px) brightness(1.06);
         background-position: 0% 54%;
         -webkit-mask-position: center, 0px 0px;
         mask-position: center, 0px 0px;
@@ -475,7 +485,7 @@
     /* ===== СКРОЛЛ: мягкий / плавный ===== */
     main{
       scroll-behavior: auto;
-      -webkit-overflow-scrolling: touch; /* iOS momentum */
+      -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scroll-snap-type: none;
       scroll-padding-top: 96px;
@@ -580,7 +590,6 @@
   <div id="toast"></div>
 
   <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
-    <!-- ШАПКА: iOS liquid glass + highlight -->
     <header class="header-glass pt-12 pb-4 px-6 flex items-center justify-between sticky top-0 z-50">
       <div class="flex items-center gap-4">
         <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid header-hl">
@@ -1511,7 +1520,7 @@
     if(!main) return;
     _softBound = true;
 
-    if(_isIOS) return; // iOS оставляем нативный самый приятный
+    if(_isIOS) return;
 
     const onWheel = (e) => {
       const delta = e.deltaY || 0;
