@@ -13,47 +13,56 @@ app.use(express.json({ limit: "2mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// public лежит на уровень выше app
-const publicDir = path.join(__dirname, "..", "public");
-app.use(express.static(publicDir));
+/**
+ * ВАЖНО:
+ * Теперь index.js лежит в КОРНЕ проекта.
+ * Поэтому public — это "./public", а не "../public".
+ */
+const publicDir = path.join(__dirname, "public");
+
+// Статика
+app.use(express.static(publicDir, {
+  etag: false,
+  lastModified: false,
+  setHeaders(res, filePath) {
+    // Чтобы Telegram/браузер не кешировали index.html (иначе кажется, что "не применилось")
+    if (filePath.endsWith("index.html")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.setHeader("Surrogate-Control", "no-store");
+    }
+  }
+}));
 
 /**
  * ENV
- * DATABASE_URL  - Supabase Postgres (Session Pooler, IPv4 compatible)
+ * DATABASE_URL  - строка подключения Supabase Postgres (Session pooler)
  * BOT_TOKEN     - телеграм бот токен (опционально)
  * TG_CHAT_ID    - chat_id куда слать (опционально)
  */
-const DATABASE_URL = process.env.DATABASE_URL || "";
+const DATABASE_URL = process.env.DATABASE_URL;
 
 let pool = null;
 let dbReady = false;
-let dbError = "";
+let dbInitError = "";
 
 function makePool() {
-  if (!DATABASE_URL) {
-    dbReady = false;
-    dbError = "DATABASE_URL is missing";
-    return null;
-  }
+  if (!DATABASE_URL) return null;
 
-  // ⚠️ ВАЖНО:
-  // 1) Убираем все query params (типа ?sslmode=require), чтобы pg не переопределял ssl настройку.
-  // 2) SSL включаем принудительно с rejectUnauthorized:false (без NODE_TLS_REJECT_UNAUTHORIZED=0).
-  const cleanUrl = DATABASE_URL.split("?")[0];
-
+  // Supabase pooler обычно требует TLS.
+  // "self-signed certificate in certificate chain" лечится так:
+  // ssl: { rejectUnauthorized: false }
+  // (Это безопаснее, чем NODE_TLS_REJECT_UNAUTHORIZED=0 на весь процесс.)
   return new Pool({
-    connectionString: cleanUrl,
-    ssl: { rejectUnauthorized: false },
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
   });
 }
 
-pool = makePool();
-
+// --- helpers ---
 async function q(text, params) {
-  if (!pool) throw new Error("DB pool is not initialized");
+  if (!pool) throw new Error("DB pool is not configured (DATABASE_URL missing).");
   return pool.query(text, params);
 }
 
@@ -93,45 +102,42 @@ async function ensureSchema() {
   `);
 }
 
-// Инициализация БД: не валим сервер, если БД временно недоступна.
+/**
+ * DB init — НЕ валим весь сервер, если БД временно недоступна.
+ * Иначе сайт "не открывается" вообще.
+ */
 async function initDb() {
   try {
+    if (!DATABASE_URL) {
+      dbReady = false;
+      dbInitError = "DATABASE_URL is missing.";
+      return;
+    }
+    pool = makePool();
+    await q("SELECT 1 as ok");
     await ensureSchema();
     dbReady = true;
-    dbError = "";
-    console.log("DB ready.");
+    dbInitError = "";
+    console.log("DB ready ✅");
   } catch (e) {
     dbReady = false;
-    dbError = e?.message || String(e);
-    console.log("DB init failed:", dbError);
+    dbInitError = e?.message || "db init error";
+    console.error("DB init failed:", dbInitError);
   }
 }
 
-// пробуем при старте
+// стартуем
 await initDb();
 
 // health
 app.get("/api/health", async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ ok: false, dbReady: false, error: dbError || "no pool" });
-  }
-  try {
-    await q("SELECT 1 as ok");
-    if (!dbReady) await initDb(); // вдруг ожило
-    res.json({ ok: true, dbReady: true });
-  } catch (e) {
-    dbReady = false;
-    dbError = e?.message || String(e);
-    res.status(500).json({ ok: false, dbReady: false, error: dbError });
-  }
+  res.json({ ok: true, dbReady, error: dbReady ? "" : dbInitError });
 });
 
 // list
 app.get("/api/reports", async (req, res) => {
-  if (!dbReady) {
-    return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
-  }
   try {
+    if (!dbReady) return res.status(503).json({ ok: false, error: `DB not ready: ${dbInitError}` });
     const r = await q(`SELECT * FROM reports ORDER BY created_at DESC`);
     res.json({ ok: true, reports: r.rows });
   } catch (e) {
@@ -141,17 +147,14 @@ app.get("/api/reports", async (req, res) => {
 
 // create (с защитой от дубля по request_id)
 app.post("/api/reports", async (req, res) => {
-  if (!dbReady) {
-    return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
-  }
-
   try {
+    if (!dbReady) return res.status(503).json({ ok: false, error: `DB not ready: ${dbInitError}` });
+
     const { manager, restaurant, reason, amount, start, end, comment, request_id } = req.body || {};
 
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
     }
-
     const nAmount = Number(amount);
     if (!Number.isFinite(nAmount) || nAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
@@ -196,11 +199,12 @@ app.post("/api/reports", async (req, res) => {
         `💬 Комментарий: ${row.comment || "-"}`;
 
       try {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: TG_CHAT_ID, text })
         });
+        await tgResp.json().catch(() => ({}));
       } catch (_) {}
     }
 
@@ -212,11 +216,9 @@ app.post("/api/reports", async (req, res) => {
 
 // update
 app.put("/api/reports/:id", async (req, res) => {
-  if (!dbReady) {
-    return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
-  }
-
   try {
+    if (!dbReady) return res.status(503).json({ ok: false, error: `DB not ready: ${dbInitError}` });
+
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "Bad id." });
 
@@ -228,7 +230,6 @@ app.put("/api/reports/:id", async (req, res) => {
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
     }
-
     const nAmount = Number(amount);
     if (!Number.isFinite(nAmount) || nAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
@@ -261,11 +262,9 @@ app.put("/api/reports/:id", async (req, res) => {
 
 // delete
 app.delete("/api/reports/:id", async (req, res) => {
-  if (!dbReady) {
-    return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
-  }
-
   try {
+    if (!dbReady) return res.status(503).json({ ok: false, error: `DB not ready: ${dbInitError}` });
+
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "Bad id." });
 
@@ -276,13 +275,11 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel — нужные колонки + формат ₸
+// export excel
 app.get("/api/export.xlsx", async (req, res) => {
-  if (!dbReady) {
-    return res.status(500).json({ ok: false, error: dbError || "DB not ready" });
-  }
-
   try {
+    if (!dbReady) return res.status(503).json({ ok: false, error: `DB not ready: ${dbInitError}` });
+
     const rows = (await q(`SELECT * FROM reports ORDER BY created_at DESC`)).rows;
 
     const data = rows.map((r) => ({
@@ -292,13 +289,12 @@ app.get("/api/export.xlsx", async (req, res) => {
       "Комментарий": r.comment || "",
       "Начало инцидента": r.start || "",
       "Конец инцидента": r.end || "",
-      "Длительность в часах": hoursDiff(r.start, r.end),
-      "Сумма потерь": Number(r.amount) || 0
+      "Длительность (ч)": hoursDiff(r.start, r.end),
+      "Сумма потерь (₸)": Number(r.amount) || 0
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
 
-    // Формат суммы ₸: колонка "Сумма потерь" = индекс 7
     if (ws["!ref"]) {
       const range = XLSX.utils.decode_range(ws["!ref"]);
       for (let R = range.s.r + 1; R <= range.e.r; R++) {
@@ -311,14 +307,14 @@ app.get("/api/export.xlsx", async (req, res) => {
     }
 
     ws["!cols"] = [
-      { wch: 22 }, // ТУ
-      { wch: 28 }, // Ресторан
-      { wch: 22 }, // Причина
-      { wch: 44 }, // Комментарий
-      { wch: 20 }, // Начало
-      { wch: 20 }, // Конец
-      { wch: 18 }, // Длительность
-      { wch: 16 }  // Сумма
+      { wch: 22 },
+      { wch: 28 },
+      { wch: 22 },
+      { wch: 40 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 14 },
+      { wch: 18 }
     ];
 
     const wb = XLSX.utils.book_new();
@@ -335,7 +331,7 @@ app.get("/api/export.xlsx", async (req, res) => {
   }
 });
 
-// Telegram WebApp может приходить с любыми путями — отдаём index.html
+// fallback for Telegram WebApp
 app.get(/^\/(?!api).*/, (req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
