@@ -11,122 +11,127 @@
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-    :root { --ios-blue:#0A84FF; --kfc-red:#E4002B; --item-height:52px; }
 
-    html, body { height: 100%; }
+    :root{
+      --ios-blue:#0A84FF;
+      --kfc-red:#E4002B;
+      --item-height:52px;
+
+      /* фон как в видео: холодный синий + фиолетовый + мягкое свечение */
+      --bg-base:#05050a;
+      --bg-blue:#1a2e6a;
+      --bg-cyan:#2a6dbb;
+      --bg-violet:#4a1f7a;
+      --bg-mag:#8b2f8d;
+    }
+
+    html,body{
+      height:100%;
+    }
+
     body{
       font-family:'Inter',-apple-system,sans-serif;
-      background:#000;
-      color:#fff;
       margin:0;
       overflow:hidden;
       -webkit-tap-highlight-color:transparent;
       user-select:none;
+      color:#fff;
+      background: var(--bg-base);
     }
 
-    /* ===== LIVE BACKGROUND (ANIMATED) ===== */
-    #bg-wrap{
+    /* ===== ДИНАМИЧНЫЙ ФОН (1:1 по ощущению с твоим видео) ===== */
+    #bg {
       position: fixed;
       inset: 0;
       z-index: 0;
+      pointer-events: none;
       overflow: hidden;
-      background: #000;
+      background: radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.22), transparent 60%),
+                  radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.22), transparent 60%),
+                  radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.18), transparent 60%),
+                  radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.22), transparent 60%),
+                  linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.75));
     }
 
-    /* Основная аура */
-    #bg-aurora{
+    /* движущиеся “ауры” */
+    #bg::before, #bg::after{
+      content:"";
       position:absolute;
-      inset:-35%;
-      filter: blur(70px);
-      opacity: 1;
-      transform: translate3d(0,0,0);
-      will-change: transform;
+      inset:-30%;
       background:
-        radial-gradient(closest-side at 18% 30%, rgba(228, 0, 43, 0.95), transparent 62%),
-        radial-gradient(closest-side at 70% 18%, rgba(124, 58, 237, 0.80), transparent 64%),
-        radial-gradient(closest-side at 78% 78%, rgba(10, 132, 255, 0.72), transparent 68%),
-        radial-gradient(closest-side at 22% 84%, rgba(228, 0, 43, 0.55), transparent 62%);
-      animation: auroraMove 20s ease-in-out infinite;
+        radial-gradient(closest-side at 20% 35%, rgba(42,109,187,.38), transparent 55%),
+        radial-gradient(closest-side at 75% 25%, rgba(74,31,122,.34), transparent 55%),
+        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.28), transparent 58%),
+        radial-gradient(closest-side at 30% 85%, rgba(26,46,106,.34), transparent 58%);
+      filter: blur(22px) saturate(120%);
+      opacity: .95;
+      transform: translate3d(0,0,0);
+      animation: auroraMove 10s ease-in-out infinite alternate;
     }
 
-    /* Второй слой — глубина */
-    #bg-aurora2{
-      position:absolute;
-      inset:-45%;
-      filter: blur(92px);
-      opacity: 0.90;
-      transform: translate3d(0,0,0);
-      will-change: transform;
-      background:
-        radial-gradient(closest-side at 35% 40%, rgba(228, 0, 43, 0.72), transparent 64%),
-        radial-gradient(closest-side at 62% 55%, rgba(124, 58, 237, 0.62), transparent 68%),
-        radial-gradient(closest-side at 50% 92%, rgba(10, 132, 255, 0.52), transparent 70%);
+    #bg::after{
+      opacity: .75;
+      filter: blur(34px) saturate(130%);
+      animation: auroraMove2 14s ease-in-out infinite alternate;
       mix-blend-mode: screen;
-      animation: auroraMove2 28s ease-in-out infinite;
     }
 
-    /* Центровой glow, чтобы фон точно "читался" */
-    #bg-glow{
-      position:absolute;
-      inset:0;
+    /* тонкие диагональные линии как в примере (очень мягко) */
+    #bg-lines{
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: .12;
       background:
-        radial-gradient(1000px 760px at 50% 45%, rgba(228,0,43,0.28), transparent 60%),
-        radial-gradient(1000px 760px at 60% 55%, rgba(124,58,237,0.20), transparent 62%),
-        radial-gradient(1000px 760px at 40% 60%, rgba(10,132,255,0.16), transparent 64%);
-      opacity: 1;
-      animation: breathe 8s ease-in-out infinite;
-      pointer-events:none;
+        repeating-linear-gradient(135deg,
+          rgba(255,255,255,.08) 0px,
+          rgba(255,255,255,.08) 1px,
+          transparent 1px,
+          transparent 34px);
+      mask-image: radial-gradient(600px 600px at 50% 40%, rgba(0,0,0,1), rgba(0,0,0,0));
+      animation: linesDrift 16s linear infinite;
     }
 
-    /* Noise */
+    /* лёгкий шум, чтобы фон “жил” */
     #bg-noise{
-      position:absolute;
-      inset:0;
-      opacity:0.11;
+      position: fixed;
+      inset: 0;
+      z-index: 2;
       pointer-events:none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
-      background-size: 220px 220px;
+      opacity:.09;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
       mix-blend-mode: overlay;
+      animation: noiseMove 6s steps(6) infinite;
     }
 
-    /* Виньетка — но мягче, чтобы не убивать фон */
-    #bg-vignette{
-      position:absolute;
-      inset:0;
-      background:
-        radial-gradient(1200px 900px at 50% 35%, rgba(0,0,0,0.06), rgba(0,0,0,0.56) 58%, rgba(0,0,0,0.84) 100%),
-        linear-gradient(to bottom, rgba(0,0,0,0.42), rgba(0,0,0,0.72));
-      pointer-events:none;
+    @keyframes auroraMove{
+      0%   { transform: translate(-3%, -2%) scale(1.02) rotate(0deg); }
+      50%  { transform: translate(2%, 3%)   scale(1.06) rotate(6deg); }
+      100% { transform: translate(4%, -1%)  scale(1.08) rotate(10deg); }
     }
-
-    @keyframes auroraMove {
-      0%   { transform: translate3d(-3%, -2%, 0) scale(1.08) rotate(0deg); }
-      25%  { transform: translate3d(4%, -3%, 0) scale(1.12) rotate(7deg); }
-      50%  { transform: translate3d(6%, 4%, 0) scale(1.10) rotate(0deg); }
-      75%  { transform: translate3d(-5%, 4%, 0) scale(1.13) rotate(-8deg); }
-      100% { transform: translate3d(-3%, -2%, 0) scale(1.08) rotate(0deg); }
+    @keyframes auroraMove2{
+      0%   { transform: translate(4%, 2%)  scale(1.03) rotate(0deg); }
+      50%  { transform: translate(-2%, -3%) scale(1.07) rotate(-6deg); }
+      100% { transform: translate(-4%, 1%)  scale(1.09) rotate(-10deg); }
     }
-
-    @keyframes auroraMove2 {
-      0%   { transform: translate3d(3%, 2%, 0) scale(1.12) rotate(0deg); }
-      25%  { transform: translate3d(-5%, 4%, 0) scale(1.08) rotate(-7deg); }
-      50%  { transform: translate3d(-6%, -3%, 0) scale(1.14) rotate(0deg); }
-      75%  { transform: translate3d(4%, -6%, 0) scale(1.09) rotate(9deg); }
-      100% { transform: translate3d(3%, 2%, 0) scale(1.12) rotate(0deg); }
+    @keyframes linesDrift{
+      0% { transform: translate3d(0,0,0); }
+      100% { transform: translate3d(-40px, 40px, 0); }
     }
-
-    @keyframes breathe {
-      0%,100% { opacity: 0.80; }
-      50%     { opacity: 1.00; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      #bg-aurora, #bg-aurora2, #bg-glow { animation: none !important; }
+    @keyframes noiseMove{
+      0%{ transform: translate3d(0,0,0); }
+      100%{ transform: translate3d(-40px, 20px, 0); }
     }
 
     /* ===== UI ===== */
-    .ios-card{ background:#1C1C1E;border-radius:16px;border:1px solid rgba(255,255,255,.08);}
-    .wheel-box{display:flex;align-items:center;background:#2C2C2E;border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.1);}
+    .app-shell{
+      position: relative;
+      z-index: 3;
+    }
+
+    .ios-card{ background:rgba(28,28,30,.82); border-radius:16px; border:1px solid rgba(255,255,255,.10); backdrop-filter: blur(14px); }
+    .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
     .wheel::-webkit-scrollbar{display:none;}
     .wheel-item{height:var(--item-height);display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:22px;font-weight:600;color:#444;transition:all .2s;}
@@ -135,48 +140,73 @@
     .day-btn{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;border-radius:12px;cursor:pointer;color:#ccc;}
     .day-btn.selected{background:var(--ios-blue)!important;color:#fff!important;font-weight:700;}
     .day-btn.range{background:rgba(10,132,255,.2);color:#fff;}
-    .ios-select{background:#2C2C2E;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:600;}
+    .ios-select{background:rgba(44,44,46,.86);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:600;}
     .tab-btn{flex:1;padding:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#666;border-bottom:2px solid transparent;transition:all .3s;}
     .tab-btn.active{color:#fff;border-bottom-color:var(--kfc-red);}
-    .progress-bar{height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden;margin-top:8px;}
+    .progress-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:8px;}
     .progress-fill{height:100%;background:var(--kfc-red);border-radius:2px;}
     #sum-input{background:transparent;color:var(--kfc-red);font-weight:900;text-align:center;border:none;outline:none;width:100%;}
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
     main::-webkit-scrollbar{display:none;}
+
+    /* поиск */
+    .search-box{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:12px 14px;
+      border-radius:14px;
+      background:rgba(28,28,30,.72);
+      border:1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(14px);
+      margin-bottom:14px;
+    }
+    .search-box input{
+      width:100%;
+      background:transparent;
+      border:none;
+      outline:none;
+      color:#fff;
+      font-weight:700;
+      font-size:13px;
+    }
+    .search-hint{
+      font-size:9px;
+      font-weight:800;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,.35);
+      margin:0 2px 10px;
+    }
   </style>
 </head>
 
 <body>
-  <!-- Background -->
-  <div id="bg-wrap" aria-hidden="true">
-    <div id="bg-aurora"></div>
-    <div id="bg-aurora2"></div>
-    <div id="bg-glow"></div>
-    <div id="bg-noise"></div>
-    <div id="bg-vignette"></div>
-  </div>
+  <!-- фон -->
+  <div id="bg"></div>
+  <div id="bg-lines"></div>
+  <div id="bg-noise"></div>
 
-  <!-- App -->
-  <div class="max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden" style="z-index:1;background:transparent;">
-    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/25 backdrop-blur-md z-50">
+  <div class="app-shell max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden">
+    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/30 backdrop-blur-md z-50">
       <div class="flex items-center gap-4">
         <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5">
           <i data-lucide="chevron-left" class="text-blue-500"></i>
         </button>
         <div class="flex flex-col">
           <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter text-white">KFC</h1>
-          <p class="text-[9px] text-[#E4002B] font-bold tracking-[0.2em] uppercase">Loss Control</p>
+          <p class="text-[9px] text-[#E4002B] font-bold tracking-[0.2em] uppercase">Loss control</p>
         </div>
       </div>
 
-      <button onclick="refreshFromServer()" class="text-gray-300/70 active:scale-90 transition-transform" title="Обновить">
+      <button onclick="refreshFromServer()" class="text-gray-400 active:scale-90 transition-transform" title="Обновить">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
     </header>
 
     <main id="view-container" class="flex-1 overflow-y-auto px-6 py-6 pb-48"></main>
 
-    <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/25 backdrop-blur-xl border-t border-white/5">
+    <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/35 backdrop-blur-xl border-t border-white/5">
       <div class="flex flex-col gap-3">
         <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white">Завершить позже</button>
         <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-all uppercase tracking-tight shadow-2xl">Далее</button>
@@ -188,138 +218,141 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
+  // ПУТИ API
   const API = "/api";
 
+  // ДАННЫЕ
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
-  // ОБНОВЛЕННОЕ РАСПРЕДЕЛЕНИЕ
+  // ✅ ОБНОВЛЕННОЕ РАСПРЕДЕЛЕНИЕ ТУ → РЕСТОРАНЫ (как в твоей таблице)
   const dataTU = {
     "Alyona Rainskaya": [
-      "12741 KFC Baizar Mall",
-      "12714-KFC Essentai Mall",
-      "12750-KFC Alem Plaza",
-      "12757-KFC Neftek",
-      "12768-KFC KazGu Almaty",
-      "12806-KFC NASIKHA ATYRAU",
-      "12815-KFC INFINITY MALL ATYRAU"
+      "12741 — KFC Baizar Mall",
+      "12714 — KFC Essentai Mall",
+      "12750 — KFC Alem Plaza",
+      "12757 — KFC Neftek",
+      "12768 — KFC KazGu Almaty",
+      "12806 — KFC NASIKHA ATYRAU",
+      "12815 — KFC INFINITY MALL ATYRAU"
     ],
     "Andrey Nacharov": [
-      "12736-KFC Batyr Mall",
-      "12737-KFC Sarayarka",
-      "12751-KFC UST Kamenogorsk",
-      "12772-KFC Kutuzova Pavlodar",
-      "12783-KFC MAXI MALL EKIBASTUZ",
-      "12784-KFC MAXI MALL OSKEMEN",
-      "12787-KFC Koschi",
-      "12825-KFC CENTRAL PARK SEMEY"
+      "12736 — KFC Batyr Mall",
+      "12737 — KFC Sarayarka",
+      "12751 — KFC UST Kamenogorsk",
+      "12772 — KFC Kutuzova Pavlodar",
+      "12783 — KFC MAXI MALL EKIBASTUZ",
+      "12784 — KFC MAXI MALL OSKEMEN",
+      "12787 — KFC Koschi",
+      "12825 — KFC CENTRAL PARK SEMEY"
     ],
     "Artyom Denissenko": [
-      "12708-KFC Khan Shatour",
-      "12720-KFC Respblika",
-      "12724-KFC Mechta",
-      "12733-KFC Asia Park",
-      "12796-KFC Magnum Edil",
-      "12803-KFC VSTRECHA",
-      "12821-KFC ZHYBEK ZHOLY COMPASS",
-      "12827-KFC KOKSHETAU AUEZOVA",
-      "12830-KFC NURLY ZHOL ASTANA"
+      "12708 — KFC Khan Shatour",
+      "12720 — KFC Respblika",
+      "12724 — KFC Mechta",
+      "12733 — KFC Asia Park",
+      "12796 — KFC Magnum Edil",
+      "12803 — KFC VSTRECHA",
+      "12821 — KFC ZHYBEK ZHOLY COMPASS",
+      "12827 — KFC KOKSHETAU AUEZOVA",
+      "12830 — KFC NURLY ZHOL ASTANA"
     ],
     "Igor Sokharev": [
-      "12710-KFC Keruen",
-      "12726-KFC Oasis",
-      "12782-KFC NOMAD NEW",
-      "12786-KFC Mart, Kostanay city",
-      "12809-KFC DOSTYK MALL PETROPAVLOVSK",
-      "12826-KFC KOSTANAY PLAZA"
+      "12710 — KFC Keruen",
+      "12726 — KFC Oasis",
+      "12782 — KFC NOMAD NEW",
+      "12786 — KFC Mart, Kostanay city",
+      "12809 — KFC DOSTYK MALL PETROPAVLOVSK",
+      "12826 — KFC KOSTANAY PLAZA"
     ],
     "Irina Zelenkevich": [
-      "12716-KFC Merey",
-      "12740-KFC Aktau",
-      "12754-KFC AK KALA MALL",
-      "12763-KFC Shum Mall - Aktau",
-      "12778-KFC Atameken",
-      "12780-KFC Mart Taraz",
-      "12791-KFC Kyzylorda",
-      "12829-KFC ZHAISAN"
+      "12716 — KFC Merey",
+      "12740 — KFC Aktau",
+      "12754 — KFC AK KALA MALL",
+      "12763 — KFC Shum Mall - Aktau",
+      "12778 — KFC Atameken",
+      "12780 — KFC Mart Taraz",
+      "12791 — KFC Kyzylorda",
+      "12829 — KFC ZHAISAN"
     ],
     "Lolokhon Makhmudova": [
-      "12712-KFC Googla",
-      "12722-KFC Dostik Plaza",
-      "12743-KFC Baluan Sholak",
-      "12746-KFC Forum Mall",
-      "12779-KFC Mart Almaty",
-      "12795-KFC Globus",
-      "12811-KFC APORT KULDZHA",
-      "12813-KFC RP DOSTYK",
-      "12842-KFC YASSY APARTMENTS TURKESTAN"
+      "12712 — KFC Googla",
+      "12722 — KFC Dostik Plaza",
+      "12743 — KFC Baluan Sholak",
+      "12746 — KFC Forum Mall",
+      "12779 — KFC Mart Almaty",
+      "12795 — KFC Globus",
+      "12811 — KFC APORT KULDZHA",
+      "12813 — KFC RP DOSTYK",
+      "12842 — KFC YASSY APARTMENTS TURKESTAN"
     ],
     "Nikol Tyurina": [
-      "12810-KFC Temirtau",
-      "12710-KFC Keruen city Astana",
-      "12715-KFC City Mall Karaganda",
-      "12723-KFC Bogembay",
-      "12728-KFC Green",
-      "12731-KFC Flag Karaganda",
-      "12755-KFC LITE ASTRAHANKA",
-      "12814-KFC SYGANAK",
-      "12818-KFC FOODCITY ASTANA"
+      "12810 — KFC Temirtau",
+      "12710 — KFC Keruen city Astana",
+      "12715 — KFC City Mall Karaganda",
+      "12723 — KFC Bogembay",
+      "12728 — KFC Green",
+      "12731 — KFC Flag Karaganda",
+      "12755 — KFC LITE ASTRAHANKA",
+      "12814 — KFC SYGANAK",
+      "12818 — KFC FOODCITY ASTANA"
     ],
     "Nurlan Ataibekov": [
-      "12703-KFC Mega Almaty",
-      "12704-KFC Domillion",
-      "12713-KFC Aport",
-      "12732-KFC Adem",
-      "12761-KFC Kulager",
-      "12770-KFC Ainabulak",
-      "12790-KFC Kaskelen",
-      "12808-KFC COMPASS BISHKEK HIGHWAY",
-      "12816-KFC APORT MIAMI"
+      "12703 — KFC Mega Almaty",
+      "12704 — KFC Domillion",
+      "12713 — KFC Aport",
+      "12732 — KFC Adem",
+      "12761 — KFC Kulager",
+      "12770 — KFC Ainabulak",
+      "12790 — KFC Kaskelen",
+      "12808 — KFC COMPASS BISHKEK HIGHWAY",
+      "12816 — KFC APORT MIAMI"
     ],
     "Tolkinbek Zulpykhar": [
-      "12820 KFC Dalida Mall Aktobe",
-      "12706-KFC Manasa",
-      "12738-KFC GOLDEN KEY",
-      "12745-KFC Mega Expo",
-      "12747-KFC Central Stadium - Akotobe",
-      "12753-KFC Keruen City Mall - Aktobe",
-      "12828-KFC INCITY ASTANA"
+      "12820 — KFC Dalida Mall Aktobe",
+      "12706 — KFC Manasa",
+      "12738 — KFC GOLDEN KEY",
+      "12745 — KFC Mega Expo",
+      "12747 — KFC Central Stadium - Akotobe",
+      "12753 — KFC Keruen City Mall - Aktobe",
+      "12828 — KFC INCITY ASTANA"
     ],
     "Ulan Toiganbayev": [
-      "12709-KFC Maxima",
-      "12711-KFC ADK",
-      "12725-KFC Mega Park",
-      "12729-KFC Tole Bi",
-      "12730-KFC Moscow Mall",
-      "12756-KFC SILKWAY CITY",
-      "12773-KFC TSUM",
-      "12798-KFC Compass",
-      "12804-KFC GRES"
+      "12709 — KFC Maxima",
+      "12711 — KFC ADK",
+      "12725 — KFC Mega Park",
+      "12729 — KFC Tole Bi",
+      "12730 — KFC Moscow Mall",
+      "12756 — KFC SILKWAY CITY",
+      "12773 — KFC TSUM",
+      "12798 — KFC Compass",
+      "12804 — KFC GRES"
     ],
     "Valeriya Toishiyeva": [
-      "12839 KFC Shymkent Tashkent RP",
-      "12748-KFC Shymkent Plaza",
-      "12758-KFC VAZ",
-      "12760-KFC LEMON",
-      "12777-KFC Sever - Shymkent City",
-      "12824-KFC MEGA MALL SHYMKENT",
-      "12832-KFC ALMATY AIRPORT",
-      "12839-KFC SHYMKENT TASHKENT RP",
-      "12841-KFC DALA MALL SHYMKENT"
+      "12839 — KFC Shymkent Tashkent RP",
+      "12748 — KFC Shymkent Plaza",
+      "12758 — KFC VAZ",
+      "12760 — KFC LEMON",
+      "12777 — KFC Sever - Shymkent City",
+      "12824 — KFC MEGA MALL SHYMKENT",
+      "12832 — KFC ALMATY AIRPORT",
+      "12839 — KFC SHYMKENT TASHKENT RP",
+      "12841 — KFC DALA MALL SHYMKENT"
     ],
     "Zhaidary Talapova": [
-      "12734-KFC ATAKENT",
-      "12774-KFC Asia Park Almaty",
-      "12775-KFC MAGNUM - RELOCATION",
-      "12776-KFC Malika",
-      "12799-KFC Saryarka Almaty",
-      "12800-KFC Masato",
-      "12801-KFC Aksai",
-      "12807-KFC SPUTNIK MALL",
-      "12819-KFC GRAND PARK ALMATY"
+      "12734 — KFC ATAKENT",
+      "12774 — KFC Asia Park Almaty",
+      "12775 — KFC MAGNUM - RELOCATION",
+      "12776 — KFC Malika",
+      "12799 — KFC Saryarka Almaty",
+      "12800 — KFC Masato",
+      "12801 — KFC Aksai",
+      "12807 — KFC SPUTNIK MALL",
+      "12819 — KFC GRAND PARK ALMATY"
     ]
   };
 
+  // LocalStorage: только черновики
   const STORAGE_KEY = 'kfc_loss_pro_v9';
 
   let db = { reports: [], drafts: [] };
@@ -342,6 +375,7 @@
   }
 
   function parseRuDateTime(str) {
+    // "dd.mm.yyyy hh:mm"
     if (!str || typeof str !== "string") return null;
     const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
     if (!m) return null;
@@ -379,16 +413,25 @@
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
-  function safePopup(title, message) {
-    if (!tg || typeof tg.showPopup !== "function") return;
-    try { tg.showPopup({ title, message, buttons: [{ type: "ok" }] }); } catch (_) {}
+  // ✅ безопасное уведомление (без webAppPopupOpened)
+  function safeToast(title, message) {
+    if (!tg) return;
+    try {
+      if (typeof tg.showPopup === "function") {
+        tg.showPopup({ title, message, buttons: [{ type: "ok" }] });
+        return;
+      }
+      if (typeof tg.showAlert === "function") {
+        tg.showAlert(`${title}\n${message}`);
+      }
+    } catch (_) {}
   }
 
   async function refreshFromServer() {
     try {
       await loadReportsFromServer();
       render();
-      safePopup("Готово", "Данные с сервера обновлены.");
+      safeToast("Готово", "Данные обновлены с сервера.");
     } catch (e) {
       alert("Не удалось обновить данные: " + (e?.message || e));
     }
@@ -404,7 +447,11 @@
     analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
     analyticsTab: 'restaurants',
     draftId: null,
-    editId: null
+    editId: null,
+
+    // поиск
+    searchManager: '',
+    searchRestaurant: ''
   };
 
   let historyStack = ['main'];
@@ -415,6 +462,7 @@
     const backBtn = document.getElementById('back-btn');
     const title = document.getElementById('header-title');
     const laterBtn = document.getElementById('later-btn');
+    const primaryBtn = document.getElementById('primary-btn');
 
     container.innerHTML = '';
     backBtn.classList.toggle('hidden', state.view === 'main');
@@ -427,17 +475,17 @@
         <div class="grid grid-cols-2 gap-4 mb-8">
           <button onclick="startFlow()" class="ios-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500 active:scale-95 transition-all">
             <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-[#E4002B]"><i data-lucide="plus"></i></div>
-            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-400">Внести потери</span>
+            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-300">Внести потери</span>
           </button>
           <button onclick="navigate('analytics_period')" class="ios-card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
-            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-500"><i data-lucide="bar-chart-3"></i></div>
-            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-400">Аналитика</span>
+            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-400"><i data-lucide="bar-chart-3"></i></div>
+            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-300">Аналитика</span>
           </button>
         </div>
 
         ${db.drafts.length ? `
         <div class="mb-8">
-          <p class="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-3 px-1">Черновики</p>
+          <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3 px-1">Черновики</p>
           <div class="space-y-3">
             ${db.drafts.map(d => `
               <div class="relative group">
@@ -445,13 +493,13 @@
                   <div class="text-left overflow-hidden mr-2">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="draft-badge">Продолжить</span>
-                      <span class="text-[9px] font-bold text-gray-500 uppercase">${d.manager || '...'}</span>
+                      <span class="text-[9px] font-bold text-gray-300 uppercase">${d.manager || '...'}</span>
                     </div>
-                    <p class="text-xs font-bold truncate">${d.restaurant ? (d.restaurant.includes('-') ? d.restaurant.split('-')[1] : d.restaurant) : 'Новый отчет'}</p>
+                    <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(' — ')[1] : 'Новый отчет'}</p>
                   </div>
-                  <i data-lucide="chevron-right" class="w-4 h-4 text-gray-700"></i>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300/40"></i>
                 </button>
-                <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors">
+                <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black/40 border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors">
                   <i data-lucide="x" class="w-3 h-3"></i>
                 </button>
               </div>
@@ -460,31 +508,66 @@
         </div>` : ''}
 
         <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
-          <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500"><i data-lucide="history"></i></div>
-          <span class="font-bold text-xs uppercase tracking-widest text-gray-400">История записей</span>
+          <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400"><i data-lucide="history"></i></div>
+          <span class="font-bold text-xs uppercase tracking-widest text-gray-300">История записей</span>
         </button>
       `;
     }
 
     else if (state.view === 'managers') {
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
-      Object.keys(dataTU).sort().forEach(m => {
-        container.innerHTML += `<button onclick="state.manager='${m}';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
+
+      container.innerHTML = `
+        <div class="search-hint">поиск</div>
+        <div class="search-box">
+          <i data-lucide="search" class="w-4 h-4 text-white/40"></i>
+          <input id="searchManager" placeholder="Найти менеджера..." value="${state.searchManager || ''}" oninput="state.searchManager=this.value;render()" />
+        </div>
+      `;
+
+      const list = Object.keys(dataTU).sort();
+      const query = (state.searchManager || '').trim().toLowerCase();
+      const filtered = query ? list.filter(x => x.toLowerCase().includes(query)) : list;
+
+      filtered.forEach(m => {
+        container.innerHTML += `<button onclick="state.manager='${m}'; state.searchRestaurant=''; navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
+
+      if (!filtered.length) {
+        container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
+      }
     }
 
     else if (state.view === 'restaurants') {
       title.innerText = "Ресторан";
-      (dataTU[state.manager] || []).forEach(r => {
-        container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
+
+      container.innerHTML = `
+        <div class="search-hint">поиск</div>
+        <div class="search-box">
+          <i data-lucide="search" class="w-4 h-4 text-white/40"></i>
+          <input id="searchRestaurant" placeholder="Найти ресторан..." value="${state.searchRestaurant || ''}" oninput="state.searchRestaurant=this.value;render()" />
+        </div>
+      `;
+
+      const all = (dataTU[state.manager] || []);
+      const q = (state.searchRestaurant || '').trim().toLowerCase();
+      const filtered = q ? all.filter(x => x.toLowerCase().includes(q)) : all;
+
+      filtered.forEach(r => {
+        container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
+
+      if (!filtered.length) {
+        container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
+      }
     }
 
     else if (state.view === 'reasons') {
       title.innerText = "Причина";
-      // ПОРЯДОК как ты просил:
+
+      // ✅ порядок причин как ты просил
       ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
-        container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
+        container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
 
@@ -492,11 +575,15 @@
       title.innerText = "Комментарий";
       container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
       footer.classList.remove('hidden');
-      const btn = document.getElementById('primary-btn');
-      btn.innerText = "Далее";
-      btn.disabled = false;
-      btn.classList.remove('opacity-50','pointer-events-none');
-      btn.onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
+
+      primaryBtn.innerText = "Далее";
+      primaryBtn.disabled = false;
+      primaryBtn.classList.remove("opacity-40");
+
+      primaryBtn.onclick = () => {
+        state.comment = document.getElementById('comm').value;
+        navigate('calendar');
+      };
     }
 
     else if (state.view === 'calendar') {
@@ -511,13 +598,13 @@
         <div class="ios-card p-5">
           ${!isStart ? `
           <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-            <p class="text-[8px] uppercase font-black text-blue-500 mb-1 tracking-widest">Начало</p>
-            <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${String(state.start.hour).padStart(2,'0')}:${String(state.start.min).padStart(2,'0')}</p>
+            <p class="text-[8px] uppercase font-black text-blue-400 mb-1 tracking-widest">Начало</p>
+            <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${pad2(state.start.hour)}:${pad2(state.start.min)}</p>
           </div>` : ''}
 
           <div class="flex justify-between items-center mb-6">
             <span class="text-lg font-bold">${cur.day} ${monthNamesGenitive[cur.month]}</span>
-            <div class="wheel-box"><div class="wheel" id="h-w"></div><span class="text-blue-500 px-1">:</span><div class="wheel" id="m-w"></div></div>
+            <div class="wheel-box"><div class="wheel" id="h-w"></div><span class="text-blue-400 px-1">:</span><div class="wheel" id="m-w"></div></div>
           </div>
 
           <div class="flex gap-2 mb-6 justify-center">
@@ -530,7 +617,7 @@
           </div>
 
           <div class="cal-grid">
-            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-300/50 font-bold text-center">${d}</div>`).join('')}
             ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
             ${Array.from({length:daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?'selected':''}">${i+1}</div>`).join('')}
           </div>
@@ -539,11 +626,12 @@
 
       initWheels(cur);
       footer.classList.remove('hidden');
-      const btn = document.getElementById('primary-btn');
-      btn.disabled = false;
-      btn.classList.remove('opacity-50','pointer-events-none');
-      btn.innerText = isStart ? "Установить конец" : "Далее";
-      btn.onclick = () => {
+
+      primaryBtn.innerText = isStart ? "Установить конец" : "Далее";
+      primaryBtn.disabled = false;
+      primaryBtn.classList.remove("opacity-40");
+
+      primaryBtn.onclick = () => {
         const v = getWheels();
         if (isStart) {
           state.start.hour=v.h; state.start.min=v.m;
@@ -563,25 +651,26 @@
       title.innerText = "Сумма";
       container.innerHTML = `
         <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
-          <p class="text-[10px] text-gray-500 font-black uppercase mb-1 tracking-widest">Период</p>
+          <p class="text-[10px] text-gray-300/60 font-black uppercase mb-1 tracking-widest">Период</p>
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold">${pad2(state.start.day)}.${pad2(state.start.month+1)} ${pad2(state.start.hour)}:${pad2(state.start.min)}</span>
-            <i data-lucide="arrow-right" class="w-3 h-3 text-gray-400"></i>
+            <i data-lucide="arrow-right" class="w-3 h-3 text-gray-300/60"></i>
             <span class="text-xs font-bold">${pad2(state.end.day)}.${pad2(state.end.month+1)} ${pad2(state.end.hour)}:${pad2(state.end.min)}</span>
           </div>
         </div>
 
         <div class="flex flex-col items-center py-12">
           <input type="number" id="sum-input" placeholder="0" value="${state.amount || ''}" class="text-6xl font-black" oninput="scaleSumInput(this)">
-          <p class="text-[10px] text-gray-500 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
+          <p class="text-[10px] text-gray-300/60 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
         </div>
       `;
       footer.classList.remove('hidden');
-      const btn = document.getElementById('primary-btn');
-      btn.disabled = false;
-      btn.classList.remove('opacity-50','pointer-events-none');
-      btn.innerText = state.editId ? "Сохранить" : "Завершить";
-      btn.onclick = saveReport;
+
+      primaryBtn.innerText = state.editId ? "Сохранить" : "Завершить";
+      primaryBtn.disabled = false;
+      primaryBtn.classList.remove("opacity-40");
+
+      primaryBtn.onclick = saveReport;
       setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
     }
 
@@ -596,7 +685,7 @@
         container.innerHTML += `
           <button onclick="${handler}" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
             <span>${opt.n}</span>
-            <i data-lucide="chevron-right" class="opacity-30"></i>
+            <i data-lucide="chevron-right" class="opacity-40"></i>
           </button>
         `;
       });
@@ -617,7 +706,7 @@
           </div>
 
           <div class="cal-grid">
-            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-300/50 font-bold text-center">${d}</div>`).join('')}
             ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
             ${Array.from({length:daysInMonth}).map((_, i) => {
               const ts = new Date(cal.year, cal.month, i+1).getTime();
@@ -629,14 +718,18 @@
         </div>
       `;
 
+      // ✅ кнопка "ПОКАЗАТЬ" всегда активна, когда выбран диапазон
       if (cal.start && cal.end) {
         footer.classList.remove('hidden');
         laterBtn.classList.add('hidden');
-        const btn = document.getElementById('primary-btn');
-        btn.disabled = false;
-        btn.classList.remove('opacity-50','pointer-events-none');
-        btn.innerText = "Показать";
-        btn.onclick = () => { state.filter='custom'; navigate('analytics_view'); };
+
+        primaryBtn.innerText = "Показать";
+        primaryBtn.disabled = false;
+        primaryBtn.classList.remove("opacity-40");
+
+        primaryBtn.onclick = () => { state.filter='custom'; navigate('analytics_view'); };
+      } else {
+        footer.classList.add('hidden');
       }
     }
 
@@ -647,15 +740,15 @@
 
       container.innerHTML = `
         <div class="ios-card p-6 mb-4 text-center bg-gradient-to-b from-white/5 to-transparent">
-          <p class="text-[10px] text-gray-500 font-black uppercase mb-1 tracking-widest">Общие потери</p>
+          <p class="text-[10px] text-gray-300/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
           <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
 
-          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-500/10 text-green-500 py-3 rounded-xl font-bold text-[10px] uppercase active:scale-95 transition-all">
+          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-500/10 text-green-400 py-3 rounded-xl font-bold text-[10px] uppercase active:scale-95 transition-all">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Скачать Excel
           </button>
         </div>
 
-        <div class="flex border-b border-white/5 mb-6 sticky top-0 bg-black/20 backdrop-blur-md z-10">
+        <div class="flex border-b border-white/5 mb-6 sticky top-0 bg-black/20 backdrop-blur z-10">
           <button onclick="state.analyticsTab='restaurants';render()" class="tab-btn ${state.analyticsTab==='restaurants'?'active':''}">Рестораны</button>
           <button onclick="state.analyticsTab='reasons';render()" class="tab-btn ${state.analyticsTab==='reasons'?'active':''}">Причины</button>
         </div>
@@ -676,11 +769,11 @@
           ${db.reports.map(r => `
             <div class="ios-card p-4">
               <div class="flex justify-between mb-1">
-                <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${r.manager}</span>
-                <span class="text-sm font-black text-red-500">${Number(r.amount).toLocaleString()} ₸</span>
+                <span class="text-[9px] font-black text-blue-400 uppercase tracking-widest">${r.manager}</span>
+                <span class="text-sm font-black text-red-400">${Number(r.amount).toLocaleString()} ₸</span>
               </div>
-              <p class="text-xs font-bold truncate">${(r.restaurant || '').includes('-') ? r.restaurant.split('-')[1] : r.restaurant}</p>
-              <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">
+              <p class="text-xs font-bold truncate">${(r.restaurant || '').split(' — ')[1] || r.restaurant}</p>
+              <p class="text-[8px] text-gray-300/60 uppercase font-bold mt-2">
                 ${pad2(r.start.day)}.${pad2(r.start.month+1)} ${pad2(r.start.hour)}:${pad2(r.start.min)}
                 —
                 ${pad2(r.end.day)}.${pad2(r.end.month+1)} ${pad2(r.end.hour)}:${pad2(r.end.min)}
@@ -711,12 +804,12 @@
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
-            <span class="text-xs font-bold truncate">${(name || '').includes('-') ? name.split('-')[1] : name}</span>
-            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || '').includes('-') ? name.split('-')[0] : ''}</span>
+            <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
+            <span class="text-[9px] text-gray-300/60 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
           </div>
           <div class="text-right flex flex-col items-end">
             <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
-            <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
+            <span class="text-[10px] text-gray-300/60 font-bold">${perc}%</span>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
@@ -733,8 +826,8 @@
         <div class="flex justify-between items-center mb-1">
           <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
           <div class="text-right flex flex-col items-end">
-            <span class="text-sm font-black text-red-500">${sum.toLocaleString()} ₸</span>
-            <span class="text-[10px] text-gray-500 font-bold">${perc}%</span>
+            <span class="text-sm font-black text-red-400">${sum.toLocaleString()} ₸</span>
+            <span class="text-[10px] text-gray-300/60 font-bold">${perc}%</span>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
@@ -785,7 +878,8 @@
   }
 
   async function saveReport() {
-    const val = parseInt(document.getElementById('sum-input').value) || 0;
+    const inp = document.getElementById('sum-input');
+    const val = parseInt(inp?.value || "0") || 0;
     if (val <= 0) return;
 
     state.amount = val;
@@ -842,7 +936,9 @@
       analyticsCal: state.analyticsCal,
       analyticsTab: state.analyticsTab || 'restaurants',
       draftId: null,
-      editId: id
+      editId: id,
+      searchManager: '',
+      searchRestaurant: ''
     };
 
     historyStack = ['main','history','comment'];
@@ -872,7 +968,9 @@
       analyticsCal: state.analyticsCal,
       analyticsTab: 'restaurants',
       draftId: null,
-      editId: null
+      editId: null,
+      searchManager: '',
+      searchRestaurant: ''
     };
     navigate('managers');
   }
@@ -953,8 +1051,11 @@
   }
 
   window.addEventListener('load', async () => {
-    try { await loadReportsFromServer(); }
-    catch (e) { alert("Ошибка загрузки данных: " + (e?.message || e)); }
+    try {
+      await loadReportsFromServer();
+    } catch (e) {
+      alert("Ошибка загрузки данных: " + (e?.message || e));
+    }
     render();
   });
 </script>
