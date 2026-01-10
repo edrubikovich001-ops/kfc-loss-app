@@ -33,6 +33,12 @@
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
     main::-webkit-scrollbar{display:none;}
     .btn-disabled{opacity:.5; pointer-events:none;}
+
+    /* Search UI */
+    .search-wrap{display:flex;align-items:center;gap:10px;background:#2C2C2E;border-radius:14px;padding:12px 12px;border:1px solid rgba(255,255,255,.08);}
+    .search-input{width:100%;background:transparent;border:none;outline:none;color:#fff;font-size:14px;font-weight:700;}
+    .search-input::placeholder{color:#777;font-weight:700;}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#bbb;}
   </style>
 </head>
 
@@ -68,15 +74,12 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
-  // ПУТИ API
   const API = "/api";
 
-  // ДАННЫЕ
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
-  // ✅ ОБНОВЛЕННОЕ РАСПРЕДЕЛЕНИЕ ТУ → РЕСТОРАНЫ (АКТУАЛЬНОЕ)
-  // Формат везде: "ID — NAME" (это важно для split(' — ') в UI)
+  // ✅ АКТУАЛЬНОЕ РАСПРЕДЕЛЕНИЕ ТУ → РЕСТОРАНЫ
   const dataTU = {
     "Alyona Rainskaya": [
       "12741 — KFC Baizar Mall",
@@ -87,7 +90,6 @@
       "12806 — KFC NASIKHA ATYRAU",
       "12815 — KFC INFINITY MALL ATYRAU"
     ],
-
     "Andrey Nacharov": [
       "12736 — KFC Batyr Mall",
       "12737 — KFC Sarayarka",
@@ -98,10 +100,9 @@
       "12787 — KFC Koschi",
       "12825 — KFC CENTRAL PARK SEMEY"
     ],
-
     "Artyom Denissenko": [
       "12708 — KFC Khan Shatour",
-      "12720 — KFC Respublika",
+      "12720 — KFC Respblika",
       "12724 — KFC Mechta",
       "12733 — KFC Asia Park",
       "12796 — KFC Magnum Edil",
@@ -110,7 +111,6 @@
       "12827 — KFC KOKSHETAU AUEZOVA",
       "12830 — KFC NURLY ZHOL ASTANA"
     ],
-
     "Igor Sokharev": [
       "12710 — KFC Keruen",
       "12726 — KFC Oasis",
@@ -119,7 +119,6 @@
       "12809 — KFC DOSTYK MALL PETROPAVLOVSK",
       "12826 — KFC KOSTANAY PLAZA"
     ],
-
     "Irina Zelenkevich": [
       "12716 — KFC Merey",
       "12740 — KFC Aktau",
@@ -130,7 +129,6 @@
       "12791 — KFC Kyzylorda",
       "12829 — KFC ZHAISAN"
     ],
-
     "Lolokhon Makhmudova": [
       "12712 — KFC Googla",
       "12722 — KFC Dostik Plaza",
@@ -142,7 +140,6 @@
       "12813 — KFC RP DOSTYK",
       "12842 — KFC YASSY APARTMENTS TURKESTAN"
     ],
-
     "Nikol Tyurina": [
       "12810 — KFC Temirtau",
       "12710 — KFC Keruen city Astana",
@@ -154,7 +151,6 @@
       "12814 — KFC SYGANAK",
       "12818 — KFC FOODCITY ASTANA"
     ],
-
     "Nurlan Ataibekov": [
       "12703 — KFC Mega Almaty",
       "12704 — KFC Domillion",
@@ -166,7 +162,6 @@
       "12808 — KFC COMPASS BISHKEK HIGHWAY",
       "12816 — KFC APORT MIAMI"
     ],
-
     "Tolkinbek Zulpykhar": [
       "12820 — KFC Dalida Mall Aktobe",
       "12706 — KFC Manasa",
@@ -176,7 +171,6 @@
       "12753 — KFC Keruen City Mall - Aktobe",
       "12828 — KFC INCITY ASTANA"
     ],
-
     "Ulan Toiganbayev": [
       "12709 — KFC Maxima",
       "12711 — KFC ADK",
@@ -188,7 +182,6 @@
       "12798 — KFC Compass",
       "12804 — KFC GRES"
     ],
-
     "Valeriya Toishiyeva": [
       "12839 — KFC Shymkent Tashkent RP",
       "12748 — KFC Shymkent Plaza",
@@ -200,7 +193,6 @@
       "12839 — KFC SHYMKENT TASHKENT RP",
       "12841 — KFC DALA MALL SHYMKENT"
     ],
-
     "Zhaidary Talapova": [
       "12734 — KFC ATAKENT",
       "12774 — KFC Asia Park Almaty",
@@ -214,7 +206,6 @@
     ]
   };
 
-  // LocalStorage: только черновики
   const STORAGE_KEY = 'kfc_loss_pro_v9';
 
   let db = { reports: [], drafts: [] };
@@ -237,7 +228,6 @@
   }
 
   function parseRuDateTime(str) {
-    // "dd.mm.yyyy hh:mm"
     if (!str || typeof str !== "string") return null;
     const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
     if (!m) return null;
@@ -275,13 +265,11 @@
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
-  // -------- safe popup (исправляет webAppPopupOpened) ----------
+  // safe popup
   let popupLock = false;
-
   function safePopup(title, message) {
     if (!tg || typeof tg.showPopup !== "function") return;
     if (popupLock) return;
-
     popupLock = true;
     try {
       tg.showPopup(
@@ -315,7 +303,10 @@
     analyticsTab: 'restaurants',
     draftId: null,
     editId: null,
-    requestId: null
+    requestId: null,
+
+    // ✅ поиск по ресторанам
+    restaurantQuery: ""
   };
 
   let historyStack = ['main'];
@@ -335,6 +326,22 @@
   function resetUiLocks() {
     saving = false;
     setPrimaryDisabled(false);
+  }
+
+  function filterRestaurants(list, q) {
+    const s = (q || "").trim().toLowerCase();
+    if (!s) return list;
+    return (list || []).filter(item => String(item).toLowerCase().includes(s));
+  }
+
+  // ✅ handlers поиска
+  function setRestaurantQuery(v){
+    state.restaurantQuery = v || "";
+    render();
+  }
+  function clearRestaurantQuery(){
+    state.restaurantQuery = "";
+    render();
   }
 
   function render() {
@@ -399,20 +406,59 @@
     else if (state.view === 'managers') {
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
       Object.keys(dataTU).sort().forEach(m => {
-        container.innerHTML += `<button onclick="state.manager='${m}';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
+        container.innerHTML += `<button onclick="state.manager='${m}';state.restaurantQuery='';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
       });
     }
 
+    // ✅ РЕСТОРАНЫ: ТУТ ТОЧНО ЕСТЬ ПОИСК
     else if (state.view === 'restaurants') {
       title.innerText = "Ресторан";
-      (dataTU[state.manager] || []).forEach(r => {
-        container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
-      });
+
+      const all = (dataTU[state.manager] || []);
+      const filtered = filterRestaurants(all, state.restaurantQuery);
+
+      container.innerHTML = `
+        <div class="mb-4">
+          <div class="search-wrap">
+            <i data-lucide="search" class="w-5 h-5 text-gray-500"></i>
+            <input
+              id="rest-search"
+              class="search-input"
+              placeholder="Поиск по ID или названию..."
+              value="${(state.restaurantQuery || "").replace(/"/g, '&quot;')}"
+              oninput="setRestaurantQuery(this.value)"
+            />
+            ${state.restaurantQuery ? `
+              <button onclick="clearRestaurantQuery()" class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center active:scale-95">
+                <i data-lucide="x" class="w-4 h-4 text-gray-500"></i>
+              </button>
+            ` : ``}
+          </div>
+          <div class="flex items-center justify-between mt-3">
+            <span class="chip">ТУ: ${state.manager}</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-gray-600">${filtered.length}/${all.length}</span>
+          </div>
+        </div>
+      `;
+
+      if (!filtered.length) {
+        container.innerHTML += `<p class="text-center opacity-30 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
+      } else {
+        filtered.forEach(r => {
+          container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
+        });
+      }
+
+      setTimeout(() => {
+        const inp = document.getElementById("rest-search");
+        if (inp) { try { inp.focus(); } catch (_) {} }
+      }, 50);
     }
 
+    // ✅ ПРИЧИНЫ: НУЖНЫЙ ПОРЯДОК
     else if (state.view === 'reasons') {
       title.innerText = "Причина";
-      ["Внешние факторы","Отсутствие продукта","Персонал","Внутренние факторы"].forEach(r => {
+      ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
@@ -772,7 +818,8 @@
       analyticsTab: state.analyticsTab || 'restaurants',
       draftId: null,
       editId: id,
-      requestId: null
+      requestId: null,
+      restaurantQuery: ""
     };
 
     historyStack = ['main','history','comment'];
@@ -803,7 +850,8 @@
       analyticsTab: 'restaurants',
       draftId: null,
       editId: null,
-      requestId: null
+      requestId: null,
+      restaurantQuery: ""
     };
     navigate('managers');
   }
@@ -847,7 +895,7 @@
       if(state.filter==='today') return ts >= startOfToday;
 
       if(state.filter==='week') {
-        const dow = (now.getDay() || 7) - 1; // 0..6
+        const dow = (now.getDay() || 7) - 1;
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
