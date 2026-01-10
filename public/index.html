@@ -32,7 +32,7 @@
       user-select:none;
     }
 
-    /* ===== ДИНАМИЧНЫЙ ФОН (легкий) ===== */
+    /* ===== ДИНАМИЧНЫЙ ФОН ===== */
     #bg {
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
       background:
@@ -99,25 +99,26 @@
       100%{ transform: translate3d(-40px, 20px, 0); }
     }
 
-    /* ===== LIQUID GLASS TEXT (через CSS, без тяжелого JS) ===== */
-    .glass{
+    /* ===== LIQUID GLASS TEXT ===== */
+    .glass-ui h1,
+    .glass-ui h2,
+    .glass-ui h3,
+    .glass-ui p,
+    .glass-ui span,
+    .glass-ui button,
+    .glass-ui label,
+    .glass-ui small{
       color: var(--glass-text);
       text-shadow:
         0 0 10px rgba(255,255,255,.08),
         0 0 24px rgba(120,170,255,.10),
         0 1px 0 rgba(0,0,0,.35);
-      -webkit-text-stroke: 0.25px rgba(255,255,255,.08);
-      filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+      -webkit-text-stroke: 0.2px rgba(255,255,255,.08);
     }
-    .glass-sub{
-      color: var(--glass-sub);
-      text-shadow: 0 0 14px rgba(255,255,255,.06), 0 1px 0 rgba(0,0,0,.35);
-      -webkit-text-stroke: 0.2px rgba(255,255,255,.06);
-    }
-    .glass-dim{
-      color: var(--glass-dim);
-      text-shadow: 0 1px 0 rgba(0,0,0,.35);
-      -webkit-text-stroke: 0.15px rgba(255,255,255,.05);
+    .glass-ui input,
+    .glass-ui textarea{
+      -webkit-text-stroke: 0;
+      text-shadow: none;
     }
     .glass-shimmer{
       background: linear-gradient(90deg,
@@ -143,29 +144,7 @@
       100%{ background-position: 0% 50%; }
     }
 
-    /* Автоматически делаем “стекло” на текстовых элементах внутри app, но НЕ на input/textarea */
-    .glass-ui h1,
-    .glass-ui h2,
-    .glass-ui h3,
-    .glass-ui p,
-    .glass-ui span,
-    .glass-ui button,
-    .glass-ui label,
-    .glass-ui small{
-      color: var(--glass-text);
-      text-shadow:
-        0 0 10px rgba(255,255,255,.08),
-        0 0 24px rgba(120,170,255,.10),
-        0 1px 0 rgba(0,0,0,.35);
-      -webkit-text-stroke: 0.2px rgba(255,255,255,.08);
-    }
-    .glass-ui input,
-    .glass-ui textarea{
-      -webkit-text-stroke: 0;
-      text-shadow: none;
-    }
-
-    /* ===== UI элементы ===== */
+    /* ===== UI ===== */
     .ios-card{
       background:rgba(28,28,30,.82);
       border-radius:16px;
@@ -208,7 +187,30 @@
       color:#fff;
       font-weight:700;
       font-size:13px;
-      text-shadow:none;
+    }
+
+    /* мини-тост */
+    #toast{
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:22px;
+      z-index:9999;
+      background:rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(12px);
+      padding:10px 12px;
+      border-radius:14px;
+      font-size:12px;
+      font-weight:700;
+      color:#fff;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .22s ease, transform .22s ease;
+    }
+    #toast.show{
+      opacity:1;
+      transform:translateX(-50%) translateY(-6px);
     }
   </style>
 </head>
@@ -217,6 +219,8 @@
   <div id="bg"></div>
   <div id="bg-lines"></div>
   <div id="bg-noise"></div>
+
+  <div id="toast"></div>
 
   <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
     <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/30 backdrop-blur-md z-50">
@@ -231,7 +235,7 @@
         </div>
       </div>
 
-      <button onclick="refreshFromServer()" class="text-gray-300/70 active:scale-90 transition-transform" title="Обновить">
+      <button onclick="refreshFromServer()" class="text-gray-200/70 active:scale-90 transition-transform" title="Обновить">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
     </header>
@@ -259,7 +263,7 @@
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
-  // ✅ ОБНОВЛЕННОЕ распределение ТУ -> рестораны (как прислал)
+  // ✅ распределение ТУ -> рестораны (актуальное)
   const dataTU = {
     "Alyona Rainskaya": [
       "12741 — KFC Baizar Mall",
@@ -431,11 +435,29 @@
     };
   }
 
-  async function apiJson(url, options) {
-    const resp = await fetch(url, options);
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-    return data;
+  function toast(msg){
+    const el = document.getElementById('toast');
+    if(!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>el.classList.remove('show'), 1800);
+  }
+
+  // ✅ fetch с таймаутом, чтобы Telegram WebApp не "вис"
+  async function apiJson(url, options = {}, timeoutMs = 9000) {
+    const controller = new AbortController();
+    const t = setTimeout(()=>controller.abort(), timeoutMs);
+
+    const opt = { ...options, signal: controller.signal };
+    try {
+      const resp = await fetch(url, opt);
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      return data;
+    } finally {
+      clearTimeout(t);
+    }
   }
 
   async function loadReportsFromServer() {
@@ -443,7 +465,6 @@
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
-  // ✅ Безопасный popup: чтобы НЕ ловить webAppPopupOpened
   function safePopup(title, message) {
     if (!tg) return;
     try {
@@ -455,16 +476,17 @@
   }
 
   async function refreshFromServer() {
+    toast("Обновляю...");
     try {
       await loadReportsFromServer();
       render();
       safePopup("Готово", "Данные обновлены с сервера.");
     } catch (e) {
+      toast("Ошибка обновления");
       alert("Не удалось обновить данные: " + (e?.message || e));
     }
   }
 
-  // STATE
   let state = {
     view: 'main',
     manager: '', restaurant: '', reason: '', comment: '',
@@ -507,22 +529,21 @@
 
     if (state.view === 'main') {
       title.innerText = "KFC";
-
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
           <button onclick="startFlow()" class="ios-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500 active:scale-95 transition-all">
             <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-[#E4002B]"><i data-lucide="plus"></i></div>
-            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-300">Внести потери</span>
+            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-200">Внести потери</span>
           </button>
           <button onclick="navigate('analytics_period')" class="ios-card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
-            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-400"><i data-lucide="bar-chart-3"></i></div>
-            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-300">Аналитика</span>
+            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-300"><i data-lucide="bar-chart-3"></i></div>
+            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-200">Аналитика</span>
           </button>
         </div>
 
         ${db.drafts.length ? `
         <div class="mb-8">
-          <p class="text-[9px] font-black uppercase tracking-widest text-gray-300/60 mb-3 px-1">Черновики</p>
+          <p class="text-[9px] font-black uppercase tracking-widest text-gray-200/60 mb-3 px-1">Черновики</p>
           <div class="space-y-3">
             ${db.drafts.map(d => `
               <div class="relative group">
@@ -530,13 +551,13 @@
                   <div class="text-left overflow-hidden mr-2">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="draft-badge">Продолжить</span>
-                      <span class="text-[9px] font-bold text-gray-300 uppercase">${d.manager || '...'}</span>
+                      <span class="text-[9px] font-bold text-gray-200 uppercase">${d.manager || '...'}</span>
                     </div>
                     <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(' — ')[1] : 'Новый отчет'}</p>
                   </div>
-                  <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300/40"></i>
+                  <i data-lucide="chevron-right" class="w-4 h-4 text-gray-200/40"></i>
                 </button>
-                <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black/40 border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors">
+                <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black/40 border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-200 hover:text-red-500 transition-colors">
                   <i data-lucide="x" class="w-3 h-3"></i>
                 </button>
               </div>
@@ -545,15 +566,14 @@
         </div>` : ''}
 
         <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
-          <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400"><i data-lucide="history"></i></div>
-          <span class="font-bold text-xs uppercase tracking-widest text-gray-300">История записей</span>
+          <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-300"><i data-lucide="history"></i></div>
+          <span class="font-bold text-xs uppercase tracking-widest text-gray-200">История записей</span>
         </button>
       `;
     }
 
     else if (state.view === 'managers') {
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
-
       container.innerHTML = `
         <div class="search-hint">поиск</div>
         <div class="search-box">
@@ -562,11 +582,9 @@
                  oninput="state.searchManager=this.value; render();" />
         </div>
       `;
-
       const all = Object.keys(dataTU).sort();
       const q = (state.searchManager || '').trim().toLowerCase();
       const list = q ? all.filter(x => x.toLowerCase().includes(q)) : all;
-
       if (!list.length) container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
       list.forEach(m => {
         container.innerHTML += `<button onclick="state.manager='${m}'; state.searchRestaurant=''; navigate('restaurants')"
@@ -577,7 +595,6 @@
 
     else if (state.view === 'restaurants') {
       title.innerText = "Ресторан";
-
       container.innerHTML = `
         <div class="search-hint">поиск</div>
         <div class="search-box">
@@ -586,11 +603,9 @@
                  oninput="state.searchRestaurant=this.value; render();" />
         </div>
       `;
-
       const all = (dataTU[state.manager] || []);
       const q = (state.searchRestaurant || '').trim().toLowerCase();
       const list = q ? all.filter(x => x.toLowerCase().includes(q)) : all;
-
       if (!list.length) container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
       list.forEach(r => {
         container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')"
@@ -626,13 +641,13 @@
         <div class="ios-card p-5">
           ${!isStart ? `
           <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-            <p class="text-[8px] uppercase font-black text-blue-400 mb-1 tracking-widest">Начало</p>
+            <p class="text-[8px] uppercase font-black text-blue-300 mb-1 tracking-widest">Начало</p>
             <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${pad2(state.start.hour)}:${pad2(state.start.min)}</p>
           </div>` : ''}
 
           <div class="flex justify-between items-center mb-6">
             <span class="text-lg font-bold">${cur.day} ${monthNamesGenitive[cur.month]}</span>
-            <div class="wheel-box"><div class="wheel" id="h-w"></div><span class="text-blue-400 px-1">:</span><div class="wheel" id="m-w"></div></div>
+            <div class="wheel-box"><div class="wheel" id="h-w"></div><span class="text-blue-300 px-1">:</span><div class="wheel" id="m-w"></div></div>
           </div>
 
           <div class="flex gap-2 mb-6 justify-center">
@@ -645,7 +660,7 @@
           </div>
 
           <div class="cal-grid">
-            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-300/50 font-bold text-center">${d}</div>`).join('')}
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-200/50 font-bold text-center">${d}</div>`).join('')}
             ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
             ${Array.from({length:daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?'selected':''}">${i+1}</div>`).join('')}
           </div>
@@ -674,17 +689,17 @@
       title.innerText = "Сумма";
       container.innerHTML = `
         <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
-          <p class="text-[10px] text-gray-300/60 font-black uppercase mb-1 tracking-widest">Период</p>
+          <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Период</p>
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold">${pad2(state.start.day)}.${pad2(state.start.month+1)} ${pad2(state.start.hour)}:${pad2(state.start.min)}</span>
-            <i data-lucide="arrow-right" class="w-3 h-3 text-gray-300/60"></i>
+            <i data-lucide="arrow-right" class="w-3 h-3 text-gray-200/60"></i>
             <span class="text-xs font-bold">${pad2(state.end.day)}.${pad2(state.end.month+1)} ${pad2(state.end.hour)}:${pad2(state.end.min)}</span>
           </div>
         </div>
 
         <div class="flex flex-col items-center py-12">
           <input type="number" id="sum-input" placeholder="0" value="${state.amount || ''}" class="text-6xl font-black" oninput="scaleSumInput(this)">
-          <p class="text-[10px] text-gray-300/60 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
+          <p class="text-[10px] text-gray-200/60 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
         </div>
       `;
       setPrimary(state.editId ? "Сохранить" : "Завершить", saveReport, true, true);
@@ -722,7 +737,7 @@
           </div>
 
           <div class="cal-grid">
-            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-300/50 font-bold text-center">${d}</div>`).join('')}
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-200/50 font-bold text-center">${d}</div>`).join('')}
             ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
             ${Array.from({length:daysInMonth}).map((_, i) => {
               const ts = new Date(cal.year, cal.month, i+1).getTime();
@@ -746,10 +761,10 @@
 
       container.innerHTML = `
         <div class="ios-card p-6 mb-4 text-center bg-gradient-to-b from-white/5 to-transparent">
-          <p class="text-[10px] text-gray-300/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
+          <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
           <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
 
-          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-500/10 text-green-400 py-3 rounded-xl font-bold text-[10px] uppercase active:scale-95 transition-all">
+          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-500/10 text-green-300 py-3 rounded-xl font-bold text-[10px] uppercase active:scale-95 transition-all">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Скачать Excel
           </button>
         </div>
@@ -774,11 +789,11 @@
           ${db.reports.map(r => `
             <div class="ios-card p-4">
               <div class="flex justify-between mb-1">
-                <span class="text-[9px] font-black text-blue-400 uppercase tracking-widest">${r.manager}</span>
-                <span class="text-sm font-black text-red-400">${Number(r.amount).toLocaleString()} ₸</span>
+                <span class="text-[9px] font-black text-blue-300 uppercase tracking-widest">${r.manager}</span>
+                <span class="text-sm font-black text-red-300">${Number(r.amount).toLocaleString()} ₸</span>
               </div>
               <p class="text-xs font-bold truncate">${(r.restaurant || '').split(' — ')[1] || r.restaurant}</p>
-              <p class="text-[8px] text-gray-300/60 uppercase font-bold mt-2">
+              <p class="text-[8px] text-gray-200/60 uppercase font-bold mt-2">
                 ${pad2(r.start.day)}.${pad2(r.start.month+1)} ${pad2(r.start.hour)}:${pad2(r.start.min)}
                 —
                 ${pad2(r.end.day)}.${pad2(r.end.month+1)} ${pad2(r.end.hour)}:${pad2(r.end.min)}
@@ -798,7 +813,8 @@
       }
     }
 
-    lucide.createIcons();
+    // иконки
+    try { lucide.createIcons(); } catch(_) {}
   }
 
   function renderRestList(reports, total) {
@@ -810,11 +826,11 @@
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
             <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
-            <span class="text-[9px] text-gray-300/60 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
+            <span class="text-[9px] text-gray-200/60 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
           </div>
           <div class="text-right flex flex-col items-end">
             <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
-            <span class="text-[10px] text-gray-300/60 font-bold">${perc}%</span>
+            <span class="text-[10px] text-gray-200/60 font-bold">${perc}%</span>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
@@ -831,8 +847,8 @@
         <div class="flex justify-between items-center mb-1">
           <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
           <div class="text-right flex flex-col items-end">
-            <span class="text-sm font-black text-red-400">${sum.toLocaleString()} ₸</span>
-            <span class="text-[10px] text-gray-300/60 font-bold">${perc}%</span>
+            <span class="text-sm font-black text-red-300">${sum.toLocaleString()} ₸</span>
+            <span class="text-[10px] text-gray-200/60 font-bold">${perc}%</span>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
@@ -907,10 +923,10 @@
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      });
+      }, 12000);
 
-      await loadReportsFromServer();
-
+      // подгружаем обновления в фоне, но UI уже живой
+      loadReportsFromServer().then(()=>render()).catch(()=>{});
       if (state.draftId) {
         db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
         saveDraftsToLS();
@@ -952,8 +968,8 @@
   async function deleteReport(id) {
     if (!confirm("Удалить этот инцидент?")) return;
     try {
-      await apiJson(`${API}/reports/${id}`, { method: "DELETE" });
-      await loadReportsFromServer();
+      await apiJson(`${API}/reports/${id}`, { method: "DELETE" }, 12000);
+      loadReportsFromServer().then(()=>render()).catch(()=>{});
       render();
     } catch (e) {
       alert("Ошибка: " + (e?.message || e));
@@ -1011,23 +1027,18 @@
   function filterAnalytics(reports){
     const now=new Date();
     const startOfToday=new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
     return reports.filter(r => {
       const ts = r.start?.ts || r.created_at || 0;
-
       if(state.filter==='today') return ts >= startOfToday;
-
       if(state.filter==='week') {
         const dow = (now.getDay() || 7) - 1;
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
-
       if(state.filter==='custom') {
         if (!state.analyticsCal.start || !state.analyticsCal.end) return true;
         return ts >= state.analyticsCal.start && ts <= (state.analyticsCal.end + 86400000);
       }
-
       return true;
     });
   }
@@ -1054,10 +1065,21 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  window.addEventListener('load', async () => {
-    try { await loadReportsFromServer(); }
-    catch (e) { alert("Ошибка загрузки данных: " + (e?.message || e)); }
-    render();
+  // ✅ КЛЮЧЕВО: РИСУЕМ UI СРАЗУ, А ДАННЫЕ ПОДТЯГИВАЕМ В ФОНЕ
+  window.addEventListener('load', () => {
+    try {
+      render();                 // СРАЗУ показываем кнопки
+      toast("Загрузка...");
+      loadReportsFromServer()   // в фоне
+        .then(() => { render(); toast("Готово"); })
+        .catch(e => {
+          console.log(e);
+          toast("Без данных (временно)");
+          // UI остаётся рабочим, просто история/аналитика может быть пустой пока сервер спит
+        });
+    } catch (e) {
+      alert("Ошибка интерфейса: " + (e?.message || e));
+    }
   });
 </script>
 </body>
