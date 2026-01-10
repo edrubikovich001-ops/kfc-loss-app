@@ -16,9 +16,13 @@
       --ios-blue:#0A84FF;
       --kfc-red:#E4002B;
       --item-height:52px;
+
       --glass-text: rgba(255,255,255,.92);
-      --glass-sub: rgba(255,255,255,.62);
-      --glass-dim: rgba(255,255,255,.42);
+
+      /* Параллакс-сдвиги */
+      --px: 0px;
+      --py: 0px;
+      --ps: 0px; /* scroll */
     }
 
     html,body{height:100%;}
@@ -54,6 +58,7 @@
       filter: blur(22px) saturate(120%);
       opacity: .95;
       transform: translate3d(0,0,0);
+      will-change: transform;
       animation: auroraMove 10s ease-in-out infinite alternate;
     }
     #bg::after{
@@ -62,6 +67,19 @@
       animation: auroraMove2 14s ease-in-out infinite alternate;
       mix-blend-mode: screen;
     }
+
+    /* Параллакс — применяем к псевдослоям через CSS vars */
+    #bg::before{
+      transform:
+        translate3d(calc(var(--px) * 0.60 + var(--ps) * 0.10), calc(var(--py) * 0.60 + var(--ps) * 0.25), 0)
+        scale(1.02);
+    }
+    #bg::after{
+      transform:
+        translate3d(calc(var(--px) * 0.85 + var(--ps) * 0.15), calc(var(--py) * 0.85 + var(--ps) * 0.35), 0)
+        scale(1.04);
+    }
+
     #bg-lines{
       position:fixed; inset:0; z-index:1; pointer-events:none;
       opacity:.12;
@@ -71,35 +89,41 @@
         transparent 1px,
         transparent 34px);
       mask-image: radial-gradient(650px 650px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0));
+      will-change: transform;
+      transform: translate3d(calc(var(--px) * 0.35), calc(var(--py) * 0.35), 0);
       animation: linesDrift 16s linear infinite;
     }
+
     #bg-noise{
       position:fixed; inset:0; z-index:2; pointer-events:none;
       opacity:.09;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='https://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
       mix-blend-mode: overlay;
+      will-change: transform;
+      transform: translate3d(calc(var(--px) * 0.18), calc(var(--py) * 0.18), 0);
       animation: noiseMove 6s steps(6) infinite;
     }
+
     @keyframes auroraMove{
-      0%   { transform: translate(-3%, -2%) scale(1.02) rotate(0deg); }
-      50%  { transform: translate(2%, 3%)   scale(1.06) rotate(6deg); }
-      100% { transform: translate(4%, -1%)  scale(1.08) rotate(10deg); }
+      0%   { filter: blur(22px) saturate(120%); }
+      50%  { filter: blur(24px) saturate(130%); }
+      100% { filter: blur(22px) saturate(125%); }
     }
     @keyframes auroraMove2{
-      0%   { transform: translate(4%, 2%)  scale(1.03) rotate(0deg); }
-      50%  { transform: translate(-2%, -3%) scale(1.07) rotate(-6deg); }
-      100% { transform: translate(-4%, 1%)  scale(1.09) rotate(-10deg); }
+      0%   { filter: blur(34px) saturate(130%); }
+      50%  { filter: blur(38px) saturate(140%); }
+      100% { filter: blur(34px) saturate(135%); }
     }
     @keyframes linesDrift{
-      0% { transform: translate3d(0,0,0); }
-      100% { transform: translate3d(-40px, 40px, 0); }
+      0% { transform: translate3d(calc(var(--px) * 0.35), calc(var(--py) * 0.35), 0); }
+      100% { transform: translate3d(calc(var(--px) * 0.35 - 40px), calc(var(--py) * 0.35 + 40px), 0); }
     }
     @keyframes noiseMove{
-      0%{ transform: translate3d(0,0,0); }
-      100%{ transform: translate3d(-40px, 20px, 0); }
+      0%{ transform: translate3d(calc(var(--px) * 0.18), calc(var(--py) * 0.18), 0); }
+      100%{ transform: translate3d(calc(var(--px) * 0.18 - 40px), calc(var(--py) * 0.18 + 20px), 0); }
     }
 
-    /* ===== LIQUID GLASS TEXT ===== */
+    /* ===== "ЖИДКОЕ СТЕКЛО" ТЕКСТ ===== */
     .glass-ui h1,
     .glass-ui h2,
     .glass-ui h3,
@@ -123,9 +147,9 @@
     .glass-shimmer{
       background: linear-gradient(90deg,
         rgba(255,255,255,.70),
-        rgba(180,220,255,.85),
+        rgba(180,220,255,.88),
         rgba(255,255,255,.60),
-        rgba(255,255,255,.75)
+        rgba(255,255,255,.78)
       );
       -webkit-background-clip: text;
       background-clip: text;
@@ -144,13 +168,93 @@
       100%{ background-position: 0% 50%; }
     }
 
-    /* ===== UI ===== */
+    /* ===== КАРТОЧКИ: микро-анимации + glow ===== */
     .ios-card{
       background:rgba(28,28,30,.82);
       border-radius:16px;
       border:1px solid rgba(255,255,255,.10);
       backdrop-filter: blur(14px);
+      position:relative;
+      overflow:hidden;
     }
+    .ios-card::after{
+      content:"";
+      position:absolute; inset:-2px;
+      border-radius:18px;
+      background: radial-gradient(600px 220px at 20% 10%, rgba(255,255,255,.10), transparent 55%),
+                  radial-gradient(500px 260px at 85% 30%, rgba(120,170,255,.10), transparent 60%),
+                  radial-gradient(600px 260px at 55% 90%, rgba(255,42,74,.07), transparent 60%);
+      opacity:0;
+      transition: opacity .25s ease;
+      pointer-events:none;
+      mix-blend-mode: screen;
+    }
+    .card-anim{
+      transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+    .card-anim:hover{
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,.16);
+      box-shadow: 0 18px 45px rgba(0,0,0,.45);
+    }
+    .card-anim:hover::after{ opacity:1; }
+    .card-anim:active{
+      transform: translateY(0px) scale(0.985);
+      box-shadow: 0 10px 26px rgba(0,0,0,.35);
+    }
+    .card-anim:active::after{ opacity:.75; }
+
+    /* ===== КНОПКИ "ЖИДКИЕ" ===== */
+    .btn-liquid{
+      position:relative;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(14px);
+      transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .btn-liquid::before{
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background: radial-gradient(closest-side at 30% 30%, rgba(255,255,255,.25), transparent 60%),
+                  radial-gradient(closest-side at 70% 40%, rgba(120,170,255,.18), transparent 65%);
+      opacity:.0;
+      transform: translate3d(-10%, -10%, 0);
+      transition: opacity .18s ease, transform .25s ease;
+      pointer-events:none;
+      mix-blend-mode: screen;
+    }
+    .btn-liquid::after{
+      content:"";
+      position:absolute;
+      left:-60%;
+      top:-30%;
+      width:60%;
+      height:160%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+      transform: skewX(-18deg);
+      opacity:0;
+      pointer-events:none;
+    }
+    .btn-liquid:hover{
+      border-color: rgba(255,255,255,.18);
+      box-shadow: 0 14px 34px rgba(0,0,0,.45);
+    }
+    .btn-liquid:hover::before{ opacity:.45; transform: translate3d(0,0,0); }
+    .btn-liquid:active{ transform: scale(0.985); }
+    .btn-liquid:active::before{ opacity:.70; }
+    .btn-liquid:active::after{
+      opacity:1;
+      animation: btnShine .55s ease-out;
+    }
+    @keyframes btnShine{
+      0%{ left:-60%; opacity:0; }
+      10%{ opacity:1; }
+      100%{ left:130%; opacity:0; }
+    }
+
+    /* ===== остальное UI ===== */
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
     .wheel::-webkit-scrollbar{display:none;}
@@ -161,15 +265,17 @@
     .day-btn.selected{background:var(--ios-blue)!important;color:#fff!important;font-weight:700;}
     .day-btn.range{background:rgba(10,132,255,.2);color:#fff;}
     .ios-select{background:rgba(44,44,46,.86);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:600;}
-    .tab-btn{flex:1;padding:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#666;border-bottom:2px solid transparent;transition:all .3s;}
+
+    .tab-btn{flex:1;padding:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);border-bottom:2px solid transparent;transition:all .3s;}
     .tab-btn.active{color:#fff;border-bottom-color:var(--kfc-red);}
+
     .progress-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:8px;}
     .progress-fill{height:100%;background:var(--kfc-red);border-radius:2px;}
     #sum-input{background:transparent;color:var(--kfc-red);font-weight:900;text-align:center;border:none;outline:none;width:100%;}
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
     main::-webkit-scrollbar{display:none;}
 
-    /* Search UI */
+    /* Search */
     .search-hint{font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.35);margin:0 2px 10px;}
     .search-box{
       display:flex;align-items:center;gap:10px;
@@ -189,7 +295,7 @@
       font-size:13px;
     }
 
-    /* мини-тост */
+    /* Toast */
     #toast{
       position:fixed;
       left:50%;
@@ -212,6 +318,28 @@
       opacity:1;
       transform:translateX(-50%) translateY(-6px);
     }
+
+    /* Цветные action-кнопки истории */
+    .btn-edit{
+      background: linear-gradient(180deg, rgba(10,132,255,.28), rgba(10,132,255,.12));
+      border: 1px solid rgba(10,132,255,.35);
+      color:#e9f4ff;
+    }
+    .btn-edit:hover{ border-color: rgba(10,132,255,.55); }
+    .btn-delete{
+      background: linear-gradient(180deg, rgba(228,0,43,.24), rgba(228,0,43,.10));
+      border: 1px solid rgba(228,0,43,.35);
+      color:#ffe8ee;
+    }
+    .btn-delete:hover{ border-color: rgba(228,0,43,.55); }
+
+    /* Зелёный Excel */
+    .btn-excel{
+      background: linear-gradient(180deg, rgba(34,197,94,.22), rgba(34,197,94,.10));
+      border: 1px solid rgba(34,197,94,.34);
+      color:#eafff1;
+    }
+    .btn-excel:hover{ border-color: rgba(34,197,94,.55); }
   </style>
 </head>
 
@@ -225,8 +353,8 @@
   <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
     <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/30 backdrop-blur-md z-50">
       <div class="flex items-center gap-4">
-        <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5">
-          <i data-lucide="chevron-left" class="text-blue-500"></i>
+        <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid">
+          <i data-lucide="chevron-left" class="text-blue-400"></i>
         </button>
 
         <div class="flex flex-col">
@@ -235,7 +363,7 @@
         </div>
       </div>
 
-      <button onclick="refreshFromServer()" class="text-gray-200/70 active:scale-90 transition-transform" title="Обновить">
+      <button onclick="refreshFromServer()" class="text-gray-200/70 transition-transform btn-liquid w-10 h-10 rounded-full flex items-center justify-center" title="Обновить">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
     </header>
@@ -244,10 +372,10 @@
 
     <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/35 backdrop-blur-xl border-t border-white/5">
       <div class="flex flex-col gap-3">
-        <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10">
+        <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 btn-liquid">
           Завершить позже
         </button>
-        <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-all uppercase tracking-tight shadow-2xl">
+        <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg uppercase tracking-tight shadow-2xl btn-liquid">
           Далее
         </button>
       </div>
@@ -263,7 +391,6 @@
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
-  // ✅ распределение ТУ -> рестораны (актуальное)
   const dataTU = {
     "Alyona Rainskaya": [
       "12741 — KFC Baizar Mall",
@@ -441,10 +568,9 @@
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toast._t);
-    toast._t = setTimeout(()=>el.classList.remove('show'), 1800);
+    toast._t = setTimeout(()=>el.classList.remove('show'), 1700);
   }
 
-  // ✅ fetch с таймаутом, чтобы Telegram WebApp не "вис"
   async function apiJson(url, options = {}, timeoutMs = 9000) {
     const controller = new AbortController();
     const t = setTimeout(()=>controller.abort(), timeoutMs);
@@ -531,13 +657,13 @@
       title.innerText = "KFC";
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
-          <button onclick="startFlow()" class="ios-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500 active:scale-95 transition-all">
+          <button onclick="startFlow()" class="ios-card card-anim p-6 flex flex-col items-center gap-3 border-l-4 border-red-500">
             <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-[#E4002B]"><i data-lucide="plus"></i></div>
-            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-200">Внести потери</span>
+            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-100">Внести потери</span>
           </button>
-          <button onclick="navigate('analytics_period')" class="ios-card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
+          <button onclick="navigate('analytics_period')" class="ios-card card-anim p-6 flex flex-col items-center gap-3">
             <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-300"><i data-lucide="bar-chart-3"></i></div>
-            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-200">Аналитика</span>
+            <span class="font-bold text-[10px] uppercase tracking-widest text-gray-100">Аналитика</span>
           </button>
         </div>
 
@@ -547,7 +673,7 @@
           <div class="space-y-3">
             ${db.drafts.map(d => `
               <div class="relative group">
-                <button onclick="resumeDraft('${d.draftId}')" class="w-full ios-card p-4 flex items-center justify-between active:scale-[0.98] transition-all border-l-2 border-red-500/30">
+                <button onclick="resumeDraft('${d.draftId}')" class="w-full ios-card card-anim p-4 flex items-center justify-between border-l-2 border-red-500/30">
                   <div class="text-left overflow-hidden mr-2">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="draft-badge">Продолжить</span>
@@ -557,7 +683,7 @@
                   </div>
                   <i data-lucide="chevron-right" class="w-4 h-4 text-gray-200/40"></i>
                 </button>
-                <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black/40 border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-200 hover:text-red-500 transition-colors">
+                <button onclick="deleteDraft('${d.draftId}')" class="absolute -right-2 -top-2 bg-black/40 border border-white/10 w-6 h-6 rounded-full flex items-center justify-center text-gray-200 hover:text-red-500 transition-colors btn-liquid">
                   <i data-lucide="x" class="w-3 h-3"></i>
                 </button>
               </div>
@@ -565,9 +691,9 @@
           </div>
         </div>` : ''}
 
-        <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
+        <button onclick="navigate('history')" class="w-full ios-card card-anim p-6 flex items-center gap-4">
           <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-300"><i data-lucide="history"></i></div>
-          <span class="font-bold text-xs uppercase tracking-widest text-gray-200">История записей</span>
+          <span class="font-bold text-xs uppercase tracking-widest text-gray-100">История записей</span>
         </button>
       `;
     }
@@ -588,7 +714,7 @@
       if (!list.length) container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
       list.forEach(m => {
         container.innerHTML += `<button onclick="state.manager='${m}'; state.searchRestaurant=''; navigate('restaurants')"
-          class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
+          class="w-full p-5 mb-3 ios-card card-anim text-left font-bold flex justify-between items-center">
           <span>${m}</span><i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
@@ -609,7 +735,7 @@
       if (!list.length) container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
       list.forEach(r => {
         container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')"
-          class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5">
+          class="w-full p-4 mb-2 ios-card card-anim text-left text-xs font-semibold flex justify-between items-center">
           <span>${r}</span><i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
@@ -618,7 +744,7 @@
       title.innerText = "Причина";
       ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')"
-          class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
+          class="w-full p-5 mb-3 ios-card card-anim text-left font-bold flex justify-between items-center">
           <span>${r}</span><i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
@@ -715,7 +841,7 @@
           : `state.filter='${opt.id}';navigate('analytics_view')`;
 
         container.innerHTML += `
-          <button onclick="${handler}" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
+          <button onclick="${handler}" class="w-full p-5 mb-3 ios-card card-anim text-left font-bold flex justify-between items-center">
             <span>${opt.n}</span><i data-lucide="chevron-right" class="opacity-40"></i>
           </button>
         `;
@@ -731,9 +857,9 @@
       container.innerHTML = `
         <div class="ios-card p-5">
           <div class="flex justify-between items-center mb-6">
-            <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5"><i data-lucide="chevron-left"></i></button>
+            <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid"><i data-lucide="chevron-left"></i></button>
             <span class="font-bold text-sm uppercase tracking-widest">${monthNames[cal.month]} ${cal.year}</span>
-            <button onclick="changeCalMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5"><i data-lucide="chevron-right"></i></button>
+            <button onclick="changeCalMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid"><i data-lucide="chevron-right"></i></button>
           </div>
 
           <div class="cal-grid">
@@ -764,7 +890,7 @@
           <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
           <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
 
-          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-500/10 text-green-300 py-3 rounded-xl font-bold text-[10px] uppercase active:scale-95 transition-all">
+          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[10px] uppercase btn-liquid btn-excel">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Скачать Excel
           </button>
         </div>
@@ -787,7 +913,7 @@
       } else {
         container.innerHTML = `<div class="space-y-3 pb-20">
           ${db.reports.map(r => `
-            <div class="ios-card p-4">
+            <div class="ios-card card-anim p-4">
               <div class="flex justify-between mb-1">
                 <span class="text-[9px] font-black text-blue-300 uppercase tracking-widest">${r.manager}</span>
                 <span class="text-sm font-black text-red-300">${Number(r.amount).toLocaleString()} ₸</span>
@@ -800,10 +926,10 @@
               </p>
 
               <div class="flex gap-3 mt-4">
-                <button onclick="editReport(${r.id})" class="flex-1 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white active:scale-95">
+                <button onclick="editReport(${r.id})" class="flex-1 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest btn-liquid btn-edit">
                   Редактировать
                 </button>
-                <button onclick="deleteReport(${r.id})" class="px-5 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-red-500/10 text-[#E4002B] active:scale-95">
+                <button onclick="deleteReport(${r.id})" class="px-5 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest btn-liquid btn-delete">
                   Удалить
                 </button>
               </div>
@@ -813,7 +939,6 @@
       }
     }
 
-    // иконки
     try { lucide.createIcons(); } catch(_) {}
   }
 
@@ -822,7 +947,7 @@
     reports.forEach(r => { grouped[r.restaurant] = (grouped[r.restaurant] || 0) + r.amount; });
     return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([name, sum]) => {
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
-      return `<div class="ios-card p-4">
+      return `<div class="ios-card card-anim p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
             <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
@@ -843,7 +968,7 @@
     reports.forEach(r => { grouped[r.reason] = (grouped[r.reason] || 0) + r.amount; });
     return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([reason, sum]) => {
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
-      return `<div class="ios-card p-4">
+      return `<div class="ios-card card-anim p-4">
         <div class="flex justify-between items-center mb-1">
           <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
           <div class="text-right flex flex-col items-end">
@@ -925,7 +1050,6 @@
         body: JSON.stringify(payload)
       }, 12000);
 
-      // подгружаем обновления в фоне, но UI уже живой
       loadReportsFromServer().then(()=>render()).catch(()=>{});
       if (state.draftId) {
         db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
@@ -1065,18 +1189,62 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  // ✅ КЛЮЧЕВО: РИСУЕМ UI СРАЗУ, А ДАННЫЕ ПОДТЯГИВАЕМ В ФОНЕ
+  /* ===== ПАРАЛЛАКС: скролл + палец/мышь ===== */
+  const rootStyle = document.documentElement.style;
+  let pointerX = 0, pointerY = 0;
+  let smoothX = 0, smoothY = 0;
+  let smoothS = 0;
+
+  function setParallaxFromPointer(clientX, clientY){
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
+    const nx = (clientX / w - 0.5);
+    const ny = (clientY / h - 0.5);
+    pointerX = nx * 22;  // px
+    pointerY = ny * 22;  // px
+  }
+
+  function setParallaxFromScroll(){
+    const main = document.getElementById('view-container');
+    if(!main) return 0;
+    const s = main.scrollTop || 0;
+    return -(s * 0.02); // subtle
+  }
+
+  function rafParallax(){
+    const targetS = setParallaxFromScroll();
+    smoothX += (pointerX - smoothX) * 0.10;
+    smoothY += (pointerY - smoothY) * 0.10;
+    smoothS += (targetS - smoothS) * 0.10;
+
+    rootStyle.setProperty('--px', smoothX.toFixed(2) + 'px');
+    rootStyle.setProperty('--py', smoothY.toFixed(2) + 'px');
+    rootStyle.setProperty('--ps', smoothS.toFixed(2) + 'px');
+
+    requestAnimationFrame(rafParallax);
+  }
+
+  window.addEventListener('mousemove', (e) => setParallaxFromPointer(e.clientX, e.clientY), { passive:true });
+  window.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if(t) setParallaxFromPointer(t.clientX, t.clientY);
+  }, { passive:true });
+
   window.addEventListener('load', () => {
     try {
-      render();                 // СРАЗУ показываем кнопки
+      render(); // UI сразу
+
+      const main = document.getElementById('view-container');
+      if(main){
+        main.addEventListener('scroll', () => {}, { passive:true });
+      }
+
+      requestAnimationFrame(rafParallax);
+
       toast("Загрузка...");
-      loadReportsFromServer()   // в фоне
+      loadReportsFromServer()
         .then(() => { render(); toast("Готово"); })
-        .catch(e => {
-          console.log(e);
-          toast("Без данных (временно)");
-          // UI остаётся рабочим, просто история/аналитика может быть пустой пока сервер спит
-        });
+        .catch(() => { toast("Без данных (временно)"); });
     } catch (e) {
       alert("Ошибка интерфейса: " + (e?.message || e));
     }
