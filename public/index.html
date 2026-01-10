@@ -23,11 +23,6 @@
       --px: 0px;
       --py: 0px;
       --ps: 0px; /* scroll */
-
-      /* Spotlight */
-      --sx: 50%;
-      --sy: 40%;
-      --sop: .0; /* opacity controlled via JS */
     }
 
     html,body{height:100%;}
@@ -73,7 +68,7 @@
       mix-blend-mode: screen;
     }
 
-    /* Параллакс */
+    /* Параллакс — применяем к псевдослоям через CSS vars */
     #bg::before{
       transform:
         translate3d(calc(var(--px) * 0.60 + var(--ps) * 0.10), calc(var(--py) * 0.60 + var(--ps) * 0.25), 0)
@@ -128,21 +123,6 @@
       100%{ transform: translate3d(calc(var(--px) * 0.18 - 40px), calc(var(--py) * 0.18 + 20px), 0); }
     }
 
-    /* ===== SPOTLIGHT под пальцем ===== */
-    #spotlight{
-      position:fixed; inset:0; z-index:3; pointer-events:none;
-      opacity: var(--sop);
-      transition: opacity .25s ease;
-      background:
-        radial-gradient(520px 420px at var(--sx) var(--sy),
-          rgba(255,255,255,.14),
-          rgba(140,190,255,.10) 28%,
-          rgba(255,42,74,.06) 48%,
-          transparent 68%);
-      mix-blend-mode: screen;
-      filter: blur(0px);
-    }
-
     /* ===== "ЖИДКОЕ СТЕКЛО" ТЕКСТ ===== */
     .glass-ui h1,
     .glass-ui h2,
@@ -188,7 +168,7 @@
       100%{ background-position: 0% 50%; }
     }
 
-    /* ===== КАРТОЧКИ: микро-анимации + glow + ЖИВОЙ КОНТУР ===== */
+    /* ===== КАРТОЧКИ: микро-анимации + glow ===== */
     .ios-card{
       background:rgba(28,28,30,.82);
       border-radius:16px;
@@ -197,41 +177,6 @@
       position:relative;
       overflow:hidden;
     }
-
-    /* Живой градиентный контур */
-    .ios-card.border-live{
-      border:1px solid rgba(255,255,255,.10);
-    }
-    .ios-card.border-live::before{
-      content:"";
-      position:absolute;
-      inset:-1px;
-      border-radius:18px;
-      padding:1px;
-      background: linear-gradient(120deg,
-        rgba(255,42,74,.70),
-        rgba(120,170,255,.55),
-        rgba(34,197,94,.45),
-        rgba(255,255,255,.18),
-        rgba(255,42,74,.55)
-      );
-      background-size: 240% 240%;
-      animation: borderFlow 8.5s ease-in-out infinite;
-      -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      opacity: .55;
-      pointer-events:none;
-      filter: blur(.0px);
-    }
-    @keyframes borderFlow{
-      0%{ background-position: 0% 50%; }
-      50%{ background-position: 100% 50%; }
-      100%{ background-position: 0% 50%; }
-    }
-
     .ios-card::after{
       content:"";
       position:absolute; inset:-2px;
@@ -402,7 +347,6 @@
   <div id="bg"></div>
   <div id="bg-lines"></div>
   <div id="bg-noise"></div>
-  <div id="spotlight"></div>
 
   <div id="toast"></div>
 
@@ -573,7 +517,7 @@
     ]
   };
 
-  const STORAGE_KEY = 'kfc_loss_pro_v10';
+  const STORAGE_KEY = 'kfc_loss_pro_v9';
 
   let db = { reports: [], drafts: [] };
   try {
@@ -713,11 +657,11 @@
       title.innerText = "KFC";
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
-          <button onclick="startFlow()" class="ios-card border-live card-anim p-6 flex flex-col items-center gap-3 border-l-4 border-red-500">
+          <button onclick="startFlow()" class="ios-card card-anim p-6 flex flex-col items-center gap-3 border-l-4 border-red-500">
             <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-[#E4002B]"><i data-lucide="plus"></i></div>
             <span class="font-bold text-[10px] uppercase tracking-widest text-gray-100">Внести потери</span>
           </button>
-          <button onclick="navigate('analytics_period')" class="ios-card border-live card-anim p-6 flex flex-col items-center gap-3">
+          <button onclick="navigate('analytics_period')" class="ios-card card-anim p-6 flex flex-col items-center gap-3">
             <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-300"><i data-lucide="bar-chart-3"></i></div>
             <span class="font-bold text-[10px] uppercase tracking-widest text-gray-100">Аналитика</span>
           </button>
@@ -729,7 +673,7 @@
           <div class="space-y-3">
             ${db.drafts.map(d => `
               <div class="relative group">
-                <button onclick="resumeDraft('${d.draftId}')" class="w-full ios-card border-live card-anim p-4 flex items-center justify-between border-l-2 border-red-500/30">
+                <button onclick="resumeDraft('${d.draftId}')" class="w-full ios-card card-anim p-4 flex items-center justify-between border-l-2 border-red-500/30">
                   <div class="text-left overflow-hidden mr-2">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="draft-badge">Продолжить</span>
@@ -747,7 +691,7 @@
           </div>
         </div>` : ''}
 
-        <button onclick="navigate('history')" class="w-full ios-card border-live card-anim p-6 flex items-center gap-4">
+        <button onclick="navigate('history')" class="w-full ios-card card-anim p-6 flex items-center gap-4">
           <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-300"><i data-lucide="history"></i></div>
           <span class="font-bold text-xs uppercase tracking-widest text-gray-100">История записей</span>
         </button>
@@ -758,7 +702,7 @@
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
       container.innerHTML = `
         <div class="search-hint">поиск</div>
-        <div class="search-box ios-card border-live">
+        <div class="search-box">
           <i data-lucide="search" class="w-4 h-4 text-white/40"></i>
           <input placeholder="Найти менеджера..." value="${state.searchManager || ''}"
                  oninput="state.searchManager=this.value; render();" />
@@ -770,7 +714,7 @@
       if (!list.length) container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
       list.forEach(m => {
         container.innerHTML += `<button onclick="state.manager='${m}'; state.searchRestaurant=''; navigate('restaurants')"
-          class="w-full p-5 mb-3 ios-card border-live card-anim text-left font-bold flex justify-between items-center">
+          class="w-full p-5 mb-3 ios-card card-anim text-left font-bold flex justify-between items-center">
           <span>${m}</span><i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
@@ -779,7 +723,7 @@
       title.innerText = "Ресторан";
       container.innerHTML = `
         <div class="search-hint">поиск</div>
-        <div class="search-box ios-card border-live">
+        <div class="search-box">
           <i data-lucide="search" class="w-4 h-4 text-white/40"></i>
           <input placeholder="Найти ресторан..." value="${state.searchRestaurant || ''}"
                  oninput="state.searchRestaurant=this.value; render();" />
@@ -791,7 +735,7 @@
       if (!list.length) container.innerHTML += `<p class="text-center opacity-40 py-10 uppercase text-[10px]">Ничего не найдено</p>`;
       list.forEach(r => {
         container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')"
-          class="w-full p-4 mb-2 ios-card border-live card-anim text-left text-xs font-semibold flex justify-between items-center">
+          class="w-full p-4 mb-2 ios-card card-anim text-left text-xs font-semibold flex justify-between items-center">
           <span>${r}</span><i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
@@ -800,16 +744,14 @@
       title.innerText = "Причина";
       ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')"
-          class="w-full p-5 mb-3 ios-card border-live card-anim text-left font-bold flex justify-between items-center">
+          class="w-full p-5 mb-3 ios-card card-anim text-left font-bold flex justify-between items-center">
           <span>${r}</span><i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
     }
 
     else if (state.view === 'comment') {
       title.innerText = "Комментарий";
-      container.innerHTML = `<div class="ios-card border-live p-2">
-        <textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea>
-      </div>`;
+      container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
       setPrimary("Далее", () => { state.comment = document.getElementById('comm').value; navigate('calendar'); }, true, true);
     }
 
@@ -822,7 +764,7 @@
       const daysInMonth = new Date(cur.year, cur.month + 1, 0).getDate();
 
       container.innerHTML = `
-        <div class="ios-card border-live p-5">
+        <div class="ios-card p-5">
           ${!isStart ? `
           <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
             <p class="text-[8px] uppercase font-black text-blue-300 mb-1 tracking-widest">Начало</p>
@@ -872,7 +814,7 @@
     else if (state.view === 'sum') {
       title.innerText = "Сумма";
       container.innerHTML = `
-        <div class="ios-card border-live p-4 mb-4 border-l-4 border-blue-500">
+        <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
           <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Период</p>
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold">${pad2(state.start.day)}.${pad2(state.start.month+1)} ${pad2(state.start.hour)}:${pad2(state.start.min)}</span>
@@ -899,7 +841,7 @@
           : `state.filter='${opt.id}';navigate('analytics_view')`;
 
         container.innerHTML += `
-          <button onclick="${handler}" class="w-full p-5 mb-3 ios-card border-live card-anim text-left font-bold flex justify-between items-center">
+          <button onclick="${handler}" class="w-full p-5 mb-3 ios-card card-anim text-left font-bold flex justify-between items-center">
             <span>${opt.n}</span><i data-lucide="chevron-right" class="opacity-40"></i>
           </button>
         `;
@@ -913,7 +855,7 @@
       const daysInMonth = new Date(cal.year, cal.month + 1, 0).getDate();
 
       container.innerHTML = `
-        <div class="ios-card border-live p-5">
+        <div class="ios-card p-5">
           <div class="flex justify-between items-center mb-6">
             <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid"><i data-lucide="chevron-left"></i></button>
             <span class="font-bold text-sm uppercase tracking-widest">${monthNames[cal.month]} ${cal.year}</span>
@@ -944,7 +886,7 @@
       const totalSum = filtered.reduce((a, b) => a + b.amount, 0);
 
       container.innerHTML = `
-        <div class="ios-card border-live p-6 mb-4 text-center bg-gradient-to-b from-white/5 to-transparent">
+        <div class="ios-card p-6 mb-4 text-center bg-gradient-to-b from-white/5 to-transparent">
           <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
           <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
 
@@ -971,7 +913,7 @@
       } else {
         container.innerHTML = `<div class="space-y-3 pb-20">
           ${db.reports.map(r => `
-            <div class="ios-card border-live card-anim p-4">
+            <div class="ios-card card-anim p-4">
               <div class="flex justify-between mb-1">
                 <span class="text-[9px] font-black text-blue-300 uppercase tracking-widest">${r.manager}</span>
                 <span class="text-sm font-black text-red-300">${Number(r.amount).toLocaleString()} ₸</span>
@@ -1005,7 +947,7 @@
     reports.forEach(r => { grouped[r.restaurant] = (grouped[r.restaurant] || 0) + r.amount; });
     return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([name, sum]) => {
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
-      return `<div class="ios-card border-live card-anim p-4">
+      return `<div class="ios-card card-anim p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
             <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
@@ -1026,7 +968,7 @@
     reports.forEach(r => { grouped[r.reason] = (grouped[r.reason] || 0) + r.amount; });
     return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([reason, sum]) => {
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
-      return `<div class="ios-card border-live card-anim p-4">
+      return `<div class="ios-card card-anim p-4">
         <div class="flex justify-between items-center mb-1">
           <span class="text-xs font-bold uppercase tracking-tight">${reason}</span>
           <div class="text-right flex flex-col items-end">
@@ -1247,28 +1189,19 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT ===== */
+  /* ===== ПАРАЛЛАКС: скролл + палец/мышь ===== */
   const rootStyle = document.documentElement.style;
   let pointerX = 0, pointerY = 0;
   let smoothX = 0, smoothY = 0;
   let smoothS = 0;
 
-  let spotX = 0.5, spotY = 0.4;     // normalized
-  let smoothSpotX = 0.5, smoothSpotY = 0.4;
-  let targetSpotOpacity = 0.0;
-  let smoothSpotOpacity = 0.0;
-
   function setParallaxFromPointer(clientX, clientY){
     const w = window.innerWidth || 1;
     const h = window.innerHeight || 1;
-
     const nx = (clientX / w - 0.5);
     const ny = (clientY / h - 0.5);
     pointerX = nx * 22;
     pointerY = ny * 22;
-
-    spotX = Math.min(1, Math.max(0, clientX / w));
-    spotY = Math.min(1, Math.max(0, clientY / h));
   }
 
   function setParallaxFromScroll(){
@@ -1280,7 +1213,6 @@
 
   function rafParallax(){
     const targetS = setParallaxFromScroll();
-
     smoothX += (pointerX - smoothX) * 0.10;
     smoothY += (pointerY - smoothY) * 0.10;
     smoothS += (targetS - smoothS) * 0.10;
@@ -1289,42 +1221,24 @@
     rootStyle.setProperty('--py', smoothY.toFixed(2) + 'px');
     rootStyle.setProperty('--ps', smoothS.toFixed(2) + 'px');
 
-    smoothSpotX += (spotX - smoothSpotX) * 0.12;
-    smoothSpotY += (spotY - smoothSpotY) * 0.12;
-    smoothSpotOpacity += (targetSpotOpacity - smoothSpotOpacity) * 0.12;
-
-    rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2) + '%');
-    rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2) + '%');
-    rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
-
     requestAnimationFrame(rafParallax);
   }
 
-  function spotlightOn(){ targetSpotOpacity = 1.0; }
-  function spotlightSoft(){ targetSpotOpacity = 0.55; }
-  function spotlightOff(){ targetSpotOpacity = 0.0; }
-
-  window.addEventListener('mousemove', (e) => { setParallaxFromPointer(e.clientX, e.clientY); spotlightSoft(); }, { passive:true });
-  window.addEventListener('mouseleave', () => spotlightOff(), { passive:true });
-
-  window.addEventListener('touchstart', (e) => {
-    const t = e.touches && e.touches[0];
-    if(t) setParallaxFromPointer(t.clientX, t.clientY);
-    spotlightOn();
-  }, { passive:true });
-
+  window.addEventListener('mousemove', (e) => setParallaxFromPointer(e.clientX, e.clientY), { passive:true });
   window.addEventListener('touchmove', (e) => {
     const t = e.touches && e.touches[0];
     if(t) setParallaxFromPointer(t.clientX, t.clientY);
-    spotlightOn();
   }, { passive:true });
-
-  window.addEventListener('touchend', () => spotlightOff(), { passive:true });
-  window.addEventListener('touchcancel', () => spotlightOff(), { passive:true });
 
   window.addEventListener('load', () => {
     try {
       render();
+
+      const main = document.getElementById('view-container');
+      if(main){
+        main.addEventListener('scroll', () => {}, { passive:true });
+      }
+
       requestAnimationFrame(rafParallax);
 
       toast("Загрузка...");
