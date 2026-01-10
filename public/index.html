@@ -17,17 +17,19 @@
       --kfc-red:#E4002B;
       --item-height:52px;
 
-      /* фон как в видео: холодный синий + фиолетовый + мягкое свечение */
       --bg-base:#05050a;
       --bg-blue:#1a2e6a;
       --bg-cyan:#2a6dbb;
       --bg-violet:#4a1f7a;
       --bg-mag:#8b2f8d;
+
+      /* liquid glass */
+      --glass-text: rgba(255,255,255,.92);
+      --glass-sub: rgba(255,255,255,.62);
+      --glass-dim: rgba(255,255,255,.42);
     }
 
-    html,body{
-      height:100%;
-    }
+    html,body{ height:100%; }
 
     body{
       font-family:'Inter',-apple-system,sans-serif;
@@ -39,7 +41,7 @@
       background: var(--bg-base);
     }
 
-    /* ===== ДИНАМИЧНЫЙ ФОН (1:1 по ощущению с твоим видео) ===== */
+    /* ===== ДИНАМИЧНЫЙ ФОН ===== */
     #bg {
       position: fixed;
       inset: 0;
@@ -53,7 +55,6 @@
                   linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.75));
     }
 
-    /* движущиеся “ауры” */
     #bg::before, #bg::after{
       content:"";
       position:absolute;
@@ -76,7 +77,6 @@
       mix-blend-mode: screen;
     }
 
-    /* тонкие диагональные линии как в примере (очень мягко) */
     #bg-lines{
       position: fixed;
       inset: 0;
@@ -93,14 +93,13 @@
       animation: linesDrift 16s linear infinite;
     }
 
-    /* лёгкий шум, чтобы фон “жил” */
     #bg-noise{
       position: fixed;
       inset: 0;
       z-index: 2;
       pointer-events:none;
       opacity:.09;
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='https://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
       mix-blend-mode: overlay;
       animation: noiseMove 6s steps(6) infinite;
     }
@@ -124,13 +123,97 @@
       100%{ transform: translate3d(-40px, 20px, 0); }
     }
 
-    /* ===== UI ===== */
-    .app-shell{
+    /* ===== LIQUID GLASS TYPOGRAPHY =====
+       Идея: “стеклянная” надпись на тёмном фоне:
+       - мягкий блик сверху
+       - тонкая обводка как у стекла
+       - подсветка и глубина
+    */
+    .glass-text{
+      color: var(--glass-text);
+      text-shadow:
+        0 0 10px rgba(255,255,255,.08),
+        0 0 24px rgba(120,170,255,.10),
+        0 1px 0 rgba(0,0,0,.35);
+      -webkit-text-stroke: 0.3px rgba(255,255,255,.08);
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
       position: relative;
-      z-index: 3;
+      letter-spacing: .01em;
     }
 
-    .ios-card{ background:rgba(28,28,30,.82); border-radius:16px; border:1px solid rgba(255,255,255,.10); backdrop-filter: blur(14px); }
+    /* верхний "блик" как на стекле */
+    .glass-text::after{
+      content: attr(data-glass);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      color: transparent;
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,.78),
+        rgba(255,255,255,.28) 28%,
+        rgba(255,255,255,.05) 55%,
+        rgba(255,255,255,0) 85%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      mix-blend-mode: screen;
+      opacity: .75;
+      transform: translateY(-.15px);
+      filter: blur(.1px);
+    }
+
+    /* чуть "жидкости": микро-перелив */
+    .glass-shimmer{
+      background: linear-gradient(90deg,
+        rgba(255,255,255,.70),
+        rgba(180,220,255,.85),
+        rgba(255,255,255,.60),
+        rgba(255,255,255,.75)
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      background-size: 240% 100%;
+      animation: shimmer 6.5s ease-in-out infinite;
+      text-shadow:
+        0 0 10px rgba(255,255,255,.06),
+        0 0 20px rgba(120,170,255,.10),
+        0 1px 0 rgba(0,0,0,.35);
+      -webkit-text-stroke: 0.25px rgba(255,255,255,.08);
+      position: relative;
+    }
+
+    @keyframes shimmer{
+      0%{ background-position: 0% 50%; }
+      50%{ background-position: 100% 50%; }
+      100%{ background-position: 0% 50%; }
+    }
+
+    .glass-sub{
+      color: var(--glass-sub);
+      text-shadow:
+        0 0 14px rgba(255,255,255,.06),
+        0 1px 0 rgba(0,0,0,.35);
+      -webkit-text-stroke: 0.2px rgba(255,255,255,.06);
+    }
+
+    .glass-dim{
+      color: var(--glass-dim);
+      text-shadow: 0 1px 0 rgba(0,0,0,.35);
+      -webkit-text-stroke: 0.15px rgba(255,255,255,.05);
+    }
+
+    /* ===== UI ===== */
+    .app-shell{ position: relative; z-index: 3; }
+
+    .ios-card{
+      background:rgba(28,28,30,.82);
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(14px);
+    }
+
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
     .wheel::-webkit-scrollbar{display:none;}
@@ -151,11 +234,8 @@
 
     /* поиск */
     .search-box{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      padding:12px 14px;
-      border-radius:14px;
+      display:flex;align-items:center;gap:10px;
+      padding:12px 14px;border-radius:14px;
       background:rgba(28,28,30,.72);
       border:1px solid rgba(255,255,255,.10);
       backdrop-filter: blur(14px);
@@ -182,7 +262,6 @@
 </head>
 
 <body>
-  <!-- фон -->
   <div id="bg"></div>
   <div id="bg-lines"></div>
   <div id="bg-noise"></div>
@@ -194,12 +273,15 @@
           <i data-lucide="chevron-left" class="text-blue-500"></i>
         </button>
         <div class="flex flex-col">
-          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter text-white">KFC</h1>
-          <p class="text-[9px] text-[#E4002B] font-bold tracking-[0.2em] uppercase">Loss control</p>
+          <!-- KFC: стекло + shimmer -->
+          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer" data-glass="KFC">KFC</h1>
+          <p class="text-[9px] font-bold tracking-[0.2em] uppercase text-[#E4002B]">
+            <span class="glass-text" data-glass="Loss control" style="color:#ff2a4a;">Loss control</span>
+          </p>
         </div>
       </div>
 
-      <button onclick="refreshFromServer()" class="text-gray-400 active:scale-90 transition-transform" title="Обновить">
+      <button onclick="refreshFromServer()" class="text-gray-300/70 active:scale-90 transition-transform" title="Обновить">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
     </header>
@@ -208,8 +290,12 @@
 
     <footer id="footer-actions" class="px-6 py-8 fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto hidden z-50 bg-black/35 backdrop-blur-xl border-t border-white/5">
       <div class="flex flex-col gap-3">
-        <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 text-white">Завершить позже</button>
-        <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-all uppercase tracking-tight shadow-2xl">Далее</button>
+        <button id="later-btn" onclick="saveDraft()" class="w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest bg-white/10 glass-text" data-glass="Завершить позже">
+          Завершить позже
+        </button>
+        <button id="primary-btn" class="w-full bg-[#E4002B] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-all uppercase tracking-tight shadow-2xl">
+          <span class="glass-text" data-glass="Далее">Далее</span>
+        </button>
       </div>
     </footer>
   </div>
@@ -218,14 +304,11 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
-  // ПУТИ API
   const API = "/api";
 
-  // ДАННЫЕ
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
-  // ✅ ОБНОВЛЕННОЕ РАСПРЕДЕЛЕНИЕ ТУ → РЕСТОРАНЫ (как в твоей таблице)
   const dataTU = {
     "Alyona Rainskaya": [
       "12741 — KFC Baizar Mall",
@@ -352,21 +435,15 @@
     ]
   };
 
-  // LocalStorage: только черновики
   const STORAGE_KEY = 'kfc_loss_pro_v9';
 
   let db = { reports: [], drafts: [] };
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
     db.drafts = Array.isArray(saved.drafts) ? saved.drafts : [];
-  } catch (_) {
-    db.drafts = [];
-  }
+  } catch (_) { db.drafts = []; }
 
-  function saveDraftsToLS() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
-  }
-
+  function saveDraftsToLS() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts })); }
   function pad2(n){ return String(n).padStart(2,'0'); }
 
   function getNowObj() {
@@ -375,7 +452,6 @@
   }
 
   function parseRuDateTime(str) {
-    // "dd.mm.yyyy hh:mm"
     if (!str || typeof str !== "string") return null;
     const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
     if (!m) return null;
@@ -413,31 +489,19 @@
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
-  // ✅ безопасное уведомление (без webAppPopupOpened)
   function safeToast(title, message) {
     if (!tg) return;
     try {
-      if (typeof tg.showPopup === "function") {
-        tg.showPopup({ title, message, buttons: [{ type: "ok" }] });
-        return;
-      }
-      if (typeof tg.showAlert === "function") {
-        tg.showAlert(`${title}\n${message}`);
-      }
+      if (typeof tg.showPopup === "function") { tg.showPopup({ title, message, buttons: [{ type: "ok" }] }); return; }
+      if (typeof tg.showAlert === "function") { tg.showAlert(`${title}\n${message}`); }
     } catch (_) {}
   }
 
   async function refreshFromServer() {
-    try {
-      await loadReportsFromServer();
-      render();
-      safeToast("Готово", "Данные обновлены с сервера.");
-    } catch (e) {
-      alert("Не удалось обновить данные: " + (e?.message || e));
-    }
+    try { await loadReportsFromServer(); render(); safeToast("Готово", "Данные обновлены с сервера."); }
+    catch (e) { alert("Не удалось обновить данные: " + (e?.message || e)); }
   }
 
-  // STATE
   let state = {
     view: 'main',
     manager: '', restaurant: '', reason: '', comment: '',
@@ -448,13 +512,50 @@
     analyticsTab: 'restaurants',
     draftId: null,
     editId: null,
-
-    // поиск
     searchManager: '',
     searchRestaurant: ''
   };
 
   let historyStack = ['main'];
+
+  // ✅ применяем glass к элементам после рендера
+  function applyLiquidGlassText(root){
+    const scope = root || document;
+    // 1) Любой uppercase/label-like текст
+    const candidates = scope.querySelectorAll(
+      'p,span,h1,h2,h3,button,div,small,label'
+    );
+
+    candidates.forEach(el => {
+      // Не трогаем иконки
+      if (el.querySelector('svg')) return;
+
+      // Текст должен быть не пустой
+      const txt = (el.textContent || '').trim();
+      if (!txt) return;
+
+      // Исключения: поля ввода / textarea
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
+
+      // Если уже настроено вручную — не мешаем
+      if (el.classList.contains('glass-text') || el.classList.contains('glass-sub') || el.classList.contains('glass-dim') || el.classList.contains('glass-shimmer')) {
+        if (!el.getAttribute('data-glass')) el.setAttribute('data-glass', txt);
+        return;
+      }
+
+      // Не превращаем в “стекло” большие числовые значения суммы (они красные), чтобы не потерять фирменный акцент
+      const isBigNumber = /^\d[\d\s.,]*₸?$/.test(txt) && txt.length >= 4;
+      if (isBigNumber) {
+        el.classList.add('glass-sub');
+        el.setAttribute('data-glass', txt);
+        return;
+      }
+
+      // По умолчанию — стекло
+      el.classList.add('glass-text');
+      el.setAttribute('data-glass', txt);
+    });
+  }
 
   function render() {
     const container = document.getElementById('view-container');
@@ -471,6 +572,9 @@
 
     if (state.view === 'main') {
       title.innerText = "KFC";
+      title.classList.add('glass-shimmer');
+      title.setAttribute('data-glass', 'KFC');
+
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
           <button onclick="startFlow()" class="ios-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500 active:scale-95 transition-all">
@@ -516,6 +620,9 @@
 
     else if (state.view === 'managers') {
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
 
       container.innerHTML = `
         <div class="search-hint">поиск</div>
@@ -540,6 +647,9 @@
 
     else if (state.view === 'restaurants') {
       title.innerText = "Ресторан";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
 
       container.innerHTML = `
         <div class="search-hint">поиск</div>
@@ -564,8 +674,10 @@
 
     else if (state.view === 'reasons') {
       title.innerText = "Причина";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
 
-      // ✅ порядок причин как ты просил
       ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-40"></i></button>`;
       });
@@ -573,23 +685,25 @@
 
     else if (state.view === 'comment') {
       title.innerText = "Комментарий";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
+
       container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
       footer.classList.remove('hidden');
 
-      primaryBtn.innerText = "Далее";
       primaryBtn.disabled = false;
       primaryBtn.classList.remove("opacity-40");
-
-      primaryBtn.onclick = () => {
-        state.comment = document.getElementById('comm').value;
-        navigate('calendar');
-      };
+      primaryBtn.onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
     }
 
     else if (state.view === 'calendar') {
       const isStart = state.stage === 'start';
       const cur = isStart ? state.start : state.end;
       title.innerText = isStart ? "Начало" : "Конец";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
 
       const firstDay = (new Date(cur.year, cur.month, 1).getDay() || 7) - 1;
       const daysInMonth = new Date(cur.year, cur.month + 1, 0).getDate();
@@ -627,10 +741,12 @@
       initWheels(cur);
       footer.classList.remove('hidden');
 
-      primaryBtn.innerText = isStart ? "Установить конец" : "Далее";
+      const primaryInner = isStart ? "Установить конец" : "Далее";
+      document.querySelector('#primary-btn span')?.setAttribute('data-glass', primaryInner);
+      document.querySelector('#primary-btn span') && (document.querySelector('#primary-btn span').textContent = primaryInner);
+
       primaryBtn.disabled = false;
       primaryBtn.classList.remove("opacity-40");
-
       primaryBtn.onclick = () => {
         const v = getWheels();
         if (isStart) {
@@ -649,6 +765,10 @@
 
     else if (state.view === 'sum') {
       title.innerText = "Сумма";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
+
       container.innerHTML = `
         <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
           <p class="text-[10px] text-gray-300/60 font-black uppercase mb-1 tracking-widest">Период</p>
@@ -666,33 +786,39 @@
       `;
       footer.classList.remove('hidden');
 
-      primaryBtn.innerText = state.editId ? "Сохранить" : "Завершить";
+      const label = state.editId ? "Сохранить" : "Завершить";
+      document.querySelector('#primary-btn span')?.setAttribute('data-glass', label);
+      document.querySelector('#primary-btn span') && (document.querySelector('#primary-btn span').textContent = label);
+
       primaryBtn.disabled = false;
       primaryBtn.classList.remove("opacity-40");
-
       primaryBtn.onclick = saveReport;
+
       setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
     }
 
     else if (state.view === 'analytics_period') {
       title.innerText = "Аналитика";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
+
       [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}]
       .forEach(opt => {
-        const handler = (opt.id === 'custom')
-          ? "navigate('analytics_custom')"
-          : `state.filter='${opt.id}';navigate('analytics_view')`;
-
+        const handler = (opt.id === 'custom') ? "navigate('analytics_custom')" : `state.filter='${opt.id}';navigate('analytics_view')`;
         container.innerHTML += `
           <button onclick="${handler}" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5">
-            <span>${opt.n}</span>
-            <i data-lucide="chevron-right" class="opacity-40"></i>
-          </button>
-        `;
+            <span>${opt.n}</span><i data-lucide="chevron-right" class="opacity-40"></i>
+          </button>`;
       });
     }
 
     else if (state.view === 'analytics_custom') {
       title.innerText = "Период";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
+
       const cal = state.analyticsCal;
       const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
       const daysInMonth = new Date(cal.year, cal.month + 1, 0).getDate();
@@ -718,15 +844,15 @@
         </div>
       `;
 
-      // ✅ кнопка "ПОКАЗАТЬ" всегда активна, когда выбран диапазон
       if (cal.start && cal.end) {
         footer.classList.remove('hidden');
-        laterBtn.classList.add('hidden');
+        document.getElementById('later-btn').classList.add('hidden');
 
-        primaryBtn.innerText = "Показать";
+        document.querySelector('#primary-btn span')?.setAttribute('data-glass', 'Показать');
+        document.querySelector('#primary-btn span') && (document.querySelector('#primary-btn span').textContent = 'Показать');
+
         primaryBtn.disabled = false;
         primaryBtn.classList.remove("opacity-40");
-
         primaryBtn.onclick = () => { state.filter='custom'; navigate('analytics_view'); };
       } else {
         footer.classList.add('hidden');
@@ -735,6 +861,10 @@
 
     else if (state.view === 'analytics_view') {
       title.innerText = "Итоги";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
+
       const filtered = filterAnalytics(db.reports);
       const totalSum = filtered.reduce((a, b) => a + b.amount, 0);
 
@@ -761,6 +891,9 @@
 
     else if (state.view === 'history') {
       title.innerText = "История";
+      title.classList.remove('glass-shimmer');
+      title.classList.add('glass-text');
+      title.setAttribute('data-glass', title.innerText);
 
       if (!db.reports.length) {
         container.innerHTML = `<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>`;
@@ -794,12 +927,13 @@
     }
 
     lucide.createIcons();
+    applyLiquidGlassText(container);
   }
 
   function renderRestList(reports, total) {
     const grouped = {};
     reports.forEach(r => { grouped[r.restaurant] = (grouped[r.restaurant] || 0) + r.amount; });
-    return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([name, sum]) => {
+    const html = Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([name, sum]) => {
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-start mb-1">
@@ -815,12 +949,13 @@
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
     }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    return html;
   }
 
   function renderReasonList(reports, total) {
     const grouped = {};
     reports.forEach(r => { grouped[r.reason] = (grouped[r.reason] || 0) + r.amount; });
-    return Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([reason, sum]) => {
+    const html = Object.entries(grouped).sort((a,b) => b[1] - a[1]).map(([reason, sum]) => {
       const perc = total > 0 ? ((sum / total) * 100).toFixed(1) : 0;
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-center mb-1">
@@ -833,6 +968,7 @@
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
     }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    return html;
   }
 
   function saveDraft() {
@@ -882,182 +1018,3 @@
     const val = parseInt(inp?.value || "0") || 0;
     if (val <= 0) return;
 
-    state.amount = val;
-
-    const startStr = `${pad2(state.start.day)}.${pad2(state.start.month+1)}.${state.start.year} ${pad2(state.start.hour)}:${pad2(state.start.min)}`;
-    const endStr   = `${pad2(state.end.day)}.${pad2(state.end.month+1)}.${state.end.year} ${pad2(state.end.hour)}:${pad2(state.end.min)}`;
-
-    const payload = {
-      manager: state.manager,
-      restaurant: state.restaurant,
-      reason: state.reason,
-      amount: state.amount,
-      start: startStr,
-      end: endStr,
-      comment: state.comment || '-'
-    };
-
-    try {
-      const isEdit = !!state.editId;
-      await apiJson(isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`, {
-        method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      await loadReportsFromServer();
-
-      if (state.draftId) {
-        db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
-        saveDraftsToLS();
-      }
-
-      state.view='main'; historyStack=['main']; state.editId=null; render();
-    } catch (e) {
-      alert(`Ошибка: ${e?.message || 'unknown'}`);
-    }
-  }
-
-  function editReport(id) {
-    const r = db.reports.find(x => x.id === id);
-    if (!r) return;
-
-    state = {
-      view:'comment',
-      manager: r.manager,
-      restaurant: r.restaurant,
-      reason: r.reason,
-      comment: r.comment || '',
-      start: JSON.parse(JSON.stringify(r.start)),
-      end: JSON.parse(JSON.stringify(r.end)),
-      stage:'start',
-      amount: r.amount || 0,
-      filter: state.filter,
-      analyticsCal: state.analyticsCal,
-      analyticsTab: state.analyticsTab || 'restaurants',
-      draftId: null,
-      editId: id,
-      searchManager: '',
-      searchRestaurant: ''
-    };
-
-    historyStack = ['main','history','comment'];
-    render();
-  }
-
-  async function deleteReport(id) {
-    if (!confirm("Удалить этот инцидент?")) return;
-    try {
-      await apiJson(`${API}/reports/${id}`, { method: "DELETE" });
-      await loadReportsFromServer();
-      render();
-    } catch (e) {
-      alert("Ошибка: " + (e?.message || e));
-    }
-  }
-
-  function startFlow() {
-    state = {
-      view:'managers',
-      manager:'', restaurant:'', reason:'', comment:'',
-      start:getNowObj(),
-      end:getNowObj(),
-      stage:'start',
-      amount:0,
-      filter: state.filter,
-      analyticsCal: state.analyticsCal,
-      analyticsTab: 'restaurants',
-      draftId: null,
-      editId: null,
-      searchManager: '',
-      searchRestaurant: ''
-    };
-    navigate('managers');
-  }
-
-  function navigate(v){ historyStack.push(v); state.view=v; render(); }
-  function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
-  function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
-  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
-
-  function setAnalyticsDate(ts){
-    if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
-      state.analyticsCal.start=ts; state.analyticsCal.end=null;
-    } else {
-      if(ts < state.analyticsCal.start){ state.analyticsCal.end=state.analyticsCal.start; state.analyticsCal.start=ts; }
-      else state.analyticsCal.end=ts;
-    }
-    render();
-  }
-
-  function changeCalMonth(s){
-    state.analyticsCal.month += s;
-    if(state.analyticsCal.month>11){state.analyticsCal.month=0;state.analyticsCal.year++;}
-    if(state.analyticsCal.month<0){state.analyticsCal.month=11;state.analyticsCal.year--;}
-    render();
-  }
-
-  function scaleSumInput(input){
-    const val=input.value;
-    if(val.length>7) input.style.fontSize='32px';
-    else if(val.length>5) input.style.fontSize='44px';
-    else input.style.fontSize='60px';
-  }
-
-  function filterAnalytics(reports){
-    const now=new Date();
-    const startOfToday=new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
-    return reports.filter(r => {
-      const ts = r.start?.ts || r.created_at || 0;
-
-      if(state.filter==='today') return ts >= startOfToday;
-
-      if(state.filter==='week') {
-        const dow = (now.getDay() || 7) - 1;
-        const startOfWeek = startOfToday - dow * 86400000;
-        return ts >= startOfWeek;
-      }
-
-      if(state.filter==='custom') {
-        if (!state.analyticsCal.start || !state.analyticsCal.end) return true;
-        return ts >= state.analyticsCal.start && ts <= (state.analyticsCal.end + 86400000);
-      }
-
-      return true;
-    });
-  }
-
-  function initWheels(t){
-    setTimeout(() => {
-      const h=document.getElementById('h-w'), m=document.getElementById('m-w');
-      if(!h || !m) return;
-      h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
-      m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
-      h.scrollTop=t.hour*52; m.scrollTop=t.min*52;
-
-      const sync=(el)=>{
-        const idx=Math.round(el.scrollTop/52);
-        el.querySelectorAll('.wheel-item').forEach((it,i)=>it.classList.toggle('active', i===idx));
-      };
-      h.onscroll=()=>sync(h); m.onscroll=()=>sync(m);
-      sync(h); sync(m);
-    }, 10);
-  }
-
-  function getWheels(){
-    const h=document.getElementById('h-w'), m=document.getElementById('m-w');
-    return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
-  }
-
-  window.addEventListener('load', async () => {
-    try {
-      await loadReportsFromServer();
-    } catch (e) {
-      alert("Ошибка загрузки данных: " + (e?.message || e));
-    }
-    render();
-  });
-</script>
-</body>
-</html>
