@@ -68,26 +68,154 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
 
+  // ПУТИ API
   const API = "/api";
 
+  // ДАННЫЕ
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
+  // ✅ ОБНОВЛЕННОЕ РАСПРЕДЕЛЕНИЕ ТУ → РЕСТОРАНЫ (АКТУАЛЬНОЕ)
+  // Формат везде: "ID — NAME" (это важно для split(' — ') в UI)
   const dataTU = {
-    "Zhaidary Talapova": ["12734 — KFC ATAKENT","12774 — KFC Asia Park Almaty","12775 — KFC MAGNUM – RELOCATION","12776 — KFC Malika","12777 — KFC Sever – Shymkent City","12779 — KFC Mart","12799 — KFC Saryarka Almaty","12800 — KFC Masato","12801 — KFC Aksai","12807 — KFC SPUTNIK MALL","12819 — KFC GRAND PARK ALMATY","12832 — KFC ALMATY AIRPORT"],
-    "Valeriya Toishiyeva": ["12748 — KFC Shymkent Plaza","12758 — KFC VAZ","12760 — KFC LEMON","12798 — KFC Compass","12804 — KFC GRES","12824 — KFC MEGA MALL SHYMKENT","12839 — KFC Shymkent Tashkent RP","12841 — KFC Dala Mall Shymkent","12843 — KFC Shymkent City Mall"],
-    "Ulan Toiganbayev": ["12711 — KFC ADK","12712 — KFC Googla","12725 — KFC Mega Park","12729 — KFC Tole Bi","12730 — KFC Moscow Mall","12747 — KFC Central Stadium – Akotobe","12753 — KFC Keruen City Mall – Aktobe","12756 — KFC SILKWAY CITY","12773 — KFC TSUM"],
-    "Nurlan Ataibekov": ["12703 — KFC Mega Almaty","12704 — KFC Domillion","12713 — KFC Aport","12732 — KFC Adem","12761 — KFC Kulager","12770 — KFC Ainabulak","12790 — KFC Kaskelen","12808 — KFC COMPASS BISHKEK HIGHWAY","12816 — KFC APORT MIAMI"],
-    "Nikol Tyurina": ["12702 — KFC Mega Astana","12715 — KFC City Mall Karaganda","12723 — KFC Bogembay","12728 — KFC Green","12731 — KFC Flag Karaganda","12755 — KFC LITE ASTRAHANKA","12810 — KFC TEMIRTAU","12814 — KFC SYGANAK","12818 — KFC Food City Astana","12828 — KFC INCITY ASTANA"],
-    "Lolokhon Makhmudova": ["12709 — KFC Maxima","12722 — KFC Dostik Plaza","12743 — KFC Bualan Sholak","12746 — KFC Forum Mall","12795 — KFC Globus","12811 — KFC APORT KULDZHA","12813 — KFC RP DOSTYK","12842 — KFC YASSY APARTMENTS TURKESTAN"],
-    "Irina Zelenkevich": ["12716 — KFC Merey","12740 — KFC Aktau","12754 — KFC AK KALA MALL","12763 — KFC Shum Mall – Aktau","12778 — KFC Atameken","12780 — KFC Taraz","12791 — KFC Kyzylorda","12829 — KFC ZHAISAN"],
-    "Igor Sokharev": ["12710 — KFC Keruen","12726 — KFC Oasis","12738 — KFC GOLDEN KEY","12745 — KFC Mega Expo","12782 — KFC NOMAD NEW","12786 — KFC Mart, Kostanay city","12809 — KFC DOSTYK MALL PETROPAVLOVSK","12826 — KFC KOSTANAY PLAZA","12827 — KFC KOKSHETAU AUEZOVA"],
-    "Artyom Denissenko": ["12706 — KFC Manasa","12708 — KFC Khan Shatour","12720 — KFC Respublika","12724 — KFC Mechta","12733 — KFC Asia Park","12796 — KFC Magnum Edil","12803 — KFC VSTRECHA","12821 — KFC ZHYBEK ZHOLY COMPASS","12830 — KFC NURLY ZHOL ASTANA"],
-    "Andrey Nacharov": ["12736 — KFC Batyr Mall","12737 — KFC Sarayarka","12751 — KFC UST Kamenogorsk","12772 — KFC Kutuzova Pavlodar","12783 — KFC MAXI MALL EKIBASTUZ","12784 — KFC MAXI MALL OSKEMEN","12787 — KFC Koschi","12825 — KFC CENTRAL PARK SEMEY"],
-    "Alyona Rainskaya": ["12714 — KFC Essentai Mall","12741 — KFC Atrau","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"]
+    "Alyona Rainskaya": [
+      "12741 — KFC Baizar Mall",
+      "12714 — KFC Essentai Mall",
+      "12750 — KFC Alem Plaza",
+      "12757 — KFC Neftek",
+      "12768 — KFC KazGu Almaty",
+      "12806 — KFC NASIKHA ATYRAU",
+      "12815 — KFC INFINITY MALL ATYRAU"
+    ],
+
+    "Andrey Nacharov": [
+      "12736 — KFC Batyr Mall",
+      "12737 — KFC Sarayarka",
+      "12751 — KFC UST Kamenogorsk",
+      "12772 — KFC Kutuzova Pavlodar",
+      "12783 — KFC MAXI MALL EKIBASTUZ",
+      "12784 — KFC MAXI MALL OSKEMEN",
+      "12787 — KFC Koschi",
+      "12825 — KFC CENTRAL PARK SEMEY"
+    ],
+
+    "Artyom Denissenko": [
+      "12708 — KFC Khan Shatour",
+      "12720 — KFC Respublika",
+      "12724 — KFC Mechta",
+      "12733 — KFC Asia Park",
+      "12796 — KFC Magnum Edil",
+      "12803 — KFC VSTRECHA",
+      "12821 — KFC ZHYBEK ZHOLY COMPASS",
+      "12827 — KFC KOKSHETAU AUEZOVA",
+      "12830 — KFC NURLY ZHOL ASTANA"
+    ],
+
+    "Igor Sokharev": [
+      "12710 — KFC Keruen",
+      "12726 — KFC Oasis",
+      "12782 — KFC NOMAD NEW",
+      "12786 — KFC Mart, Kostanay city",
+      "12809 — KFC DOSTYK MALL PETROPAVLOVSK",
+      "12826 — KFC KOSTANAY PLAZA"
+    ],
+
+    "Irina Zelenkevich": [
+      "12716 — KFC Merey",
+      "12740 — KFC Aktau",
+      "12754 — KFC AK KALA MALL",
+      "12763 — KFC Shum Mall - Aktau",
+      "12778 — KFC Atameken",
+      "12780 — KFC Mart Taraz",
+      "12791 — KFC Kyzylorda",
+      "12829 — KFC ZHAISAN"
+    ],
+
+    "Lolokhon Makhmudova": [
+      "12712 — KFC Googla",
+      "12722 — KFC Dostik Plaza",
+      "12743 — KFC Baluan Sholak",
+      "12746 — KFC Forum Mall",
+      "12779 — KFC Mart Almaty",
+      "12795 — KFC Globus",
+      "12811 — KFC APORT KULDZHA",
+      "12813 — KFC RP DOSTYK",
+      "12842 — KFC YASSY APARTMENTS TURKESTAN"
+    ],
+
+    "Nikol Tyurina": [
+      "12810 — KFC Temirtau",
+      "12710 — KFC Keruen city Astana",
+      "12715 — KFC City Mall Karaganda",
+      "12723 — KFC Bogembay",
+      "12728 — KFC Green",
+      "12731 — KFC Flag Karaganda",
+      "12755 — KFC LITE ASTRAHANKA",
+      "12814 — KFC SYGANAK",
+      "12818 — KFC FOODCITY ASTANA"
+    ],
+
+    "Nurlan Ataibekov": [
+      "12703 — KFC Mega Almaty",
+      "12704 — KFC Domillion",
+      "12713 — KFC Aport",
+      "12732 — KFC Adem",
+      "12761 — KFC Kulager",
+      "12770 — KFC Ainabulak",
+      "12790 — KFC Kaskelen",
+      "12808 — KFC COMPASS BISHKEK HIGHWAY",
+      "12816 — KFC APORT MIAMI"
+    ],
+
+    "Tolkinbek Zulpykhar": [
+      "12820 — KFC Dalida Mall Aktobe",
+      "12706 — KFC Manasa",
+      "12738 — KFC GOLDEN KEY",
+      "12745 — KFC Mega Expo",
+      "12747 — KFC Central Stadium - Akotobe",
+      "12753 — KFC Keruen City Mall - Aktobe",
+      "12828 — KFC INCITY ASTANA"
+    ],
+
+    "Ulan Toiganbayev": [
+      "12709 — KFC Maxima",
+      "12711 — KFC ADK",
+      "12725 — KFC Mega Park",
+      "12729 — KFC Tole Bi",
+      "12730 — KFC Moscow Mall",
+      "12756 — KFC SILKWAY CITY",
+      "12773 — KFC TSUM",
+      "12798 — KFC Compass",
+      "12804 — KFC GRES"
+    ],
+
+    "Valeriya Toishiyeva": [
+      "12839 — KFC Shymkent Tashkent RP",
+      "12748 — KFC Shymkent Plaza",
+      "12758 — KFC VAZ",
+      "12760 — KFC LEMON",
+      "12777 — KFC Sever - Shymkent City",
+      "12824 — KFC MEGA MALL SHYMKENT",
+      "12832 — KFC ALMATY AIRPORT",
+      "12839 — KFC SHYMKENT TASHKENT RP",
+      "12841 — KFC DALA MALL SHYMKENT"
+    ],
+
+    "Zhaidary Talapova": [
+      "12734 — KFC ATAKENT",
+      "12774 — KFC Asia Park Almaty",
+      "12775 — KFC MAGNUM - RELOCATION",
+      "12776 — KFC Malika",
+      "12799 — KFC Saryarka Almaty",
+      "12800 — KFC Masato",
+      "12801 — KFC Aksai",
+      "12807 — KFC SPUTNIK MALL",
+      "12819 — KFC GRAND PARK ALMATY"
+    ]
   };
 
-  const STORAGE_KEY = "kfc_loss_pro_v9";
+  // LocalStorage: только черновики
+  const STORAGE_KEY = 'kfc_loss_pro_v9';
 
   let db = { reports: [], drafts: [] };
   try {
@@ -101,7 +229,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
   }
 
-  function pad2(n){ return String(n).padStart(2,"0"); }
+  function pad2(n){ return String(n).padStart(2,'0'); }
 
   function getNowObj() {
     const d = new Date();
@@ -109,6 +237,7 @@
   }
 
   function parseRuDateTime(str) {
+    // "dd.mm.yyyy hh:mm"
     if (!str || typeof str !== "string") return null;
     const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})$/);
     if (!m) return null;
@@ -123,10 +252,10 @@
     const endObj = parseRuDateTime(r.end) || startObj;
     return {
       id: Number(r.id),
-      manager: r.manager || "",
-      restaurant: r.restaurant || "",
-      reason: r.reason || "",
-      comment: r.comment || "",
+      manager: r.manager || '',
+      restaurant: r.restaurant || '',
+      reason: r.reason || '',
+      comment: r.comment || '',
       amount: Number(r.amount) || 0,
       start: startObj,
       end: endObj,
@@ -146,13 +275,11 @@
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
-  // -------- FIX #2: safe popup (исправляет webAppPopupOpened) ----------
+  // -------- safe popup (исправляет webAppPopupOpened) ----------
   let popupLock = false;
 
   function safePopup(title, message) {
     if (!tg || typeof tg.showPopup !== "function") return;
-
-    // Если popup уже открыт — не пытаемся открыть новый.
     if (popupLock) return;
 
     popupLock = true;
@@ -161,7 +288,6 @@
         { title, message, buttons: [{ type: "ok" }] },
         () => { popupLock = false; }
       );
-      // На некоторых версиях callback может не сработать — делаем авторазблокировку.
       setTimeout(() => { popupLock = false; }, 1500);
     } catch (_) {
       popupLock = false;
@@ -174,26 +300,25 @@
       render();
       safePopup("Готово", "Данные с сервера обновлены.");
     } catch (e) {
-      // Ошибка только реальная (не из popup)
       alert("Не удалось обновить данные: " + (e?.message || e));
     }
   }
 
   // STATE
   let state = {
-    view: "main",
-    manager: "", restaurant: "", reason: "", comment: "",
-    start: null, end: null, stage: "start",
+    view: 'main',
+    manager: '', restaurant: '', reason: '', comment: '',
+    start: null, end: null, stage: 'start',
     amount: 0,
-    filter: "all",
+    filter: 'all',
     analyticsCal: { month: new Date().getMonth(), year: new Date().getFullYear(), start: null, end: null },
-    analyticsTab: "restaurants",
+    analyticsTab: 'restaurants',
     draftId: null,
     editId: null,
     requestId: null
   };
 
-  let historyStack = ["main"];
+  let historyStack = ['main'];
   let saving = false;
 
   function uuid() {
@@ -207,7 +332,6 @@
     btn.classList.toggle("btn-disabled", !!disabled);
   }
 
-  // -------- FIX #1 + FIX #3: жёсткий сброс блокировок при каждом render ----------
   function resetUiLocks() {
     saving = false;
     setPrimaryDisabled(false);
@@ -216,18 +340,18 @@
   function render() {
     resetUiLocks();
 
-    const container = document.getElementById("view-container");
-    const footer = document.getElementById("footer-actions");
-    const backBtn = document.getElementById("back-btn");
-    const title = document.getElementById("header-title");
-    const laterBtn = document.getElementById("later-btn");
+    const container = document.getElementById('view-container');
+    const footer = document.getElementById('footer-actions');
+    const backBtn = document.getElementById('back-btn');
+    const title = document.getElementById('header-title');
+    const laterBtn = document.getElementById('later-btn');
 
-    container.innerHTML = "";
-    backBtn.classList.toggle("hidden", state.view === "main");
-    footer.classList.add("hidden");
-    laterBtn.classList.remove("hidden");
+    container.innerHTML = '';
+    backBtn.classList.toggle('hidden', state.view === 'main');
+    footer.classList.add('hidden');
+    laterBtn.classList.remove('hidden');
 
-    if (state.view === "main") {
+    if (state.view === 'main') {
       title.innerText = "KFC";
       container.innerHTML = `
         <div class="grid grid-cols-2 gap-4 mb-8">
@@ -236,7 +360,7 @@
             <span class="font-bold text-[10px] uppercase tracking-widest text-gray-400">Внести потери</span>
           </button>
           <button onclick="navigate('analytics_period')" class="ios-card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
-            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-content-center text-green-500"><i data-lucide="bar-chart-3"></i></div>
+            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-500"><i data-lucide="bar-chart-3"></i></div>
             <span class="font-bold text-[10px] uppercase tracking-widest text-gray-400">Аналитика</span>
           </button>
         </div>
@@ -251,9 +375,9 @@
                   <div class="text-left overflow-hidden mr-2">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="draft-badge">Продолжить</span>
-                      <span class="text-[9px] font-bold text-gray-500 uppercase">${d.manager || "..."}</span>
+                      <span class="text-[9px] font-bold text-gray-500 uppercase">${d.manager || '...'}</span>
                     </div>
-                    <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(" — ")[1] : "Новый отчет"}</p>
+                    <p class="text-xs font-bold truncate">${d.restaurant ? d.restaurant.split(' — ')[1] : 'Новый отчет'}</p>
                   </div>
                   <i data-lucide="chevron-right" class="w-4 h-4 text-gray-700"></i>
                 </button>
@@ -261,9 +385,9 @@
                   <i data-lucide="x" class="w-3 h-3"></i>
                 </button>
               </div>
-            `).join("")}
+            `).join('')}
           </div>
-        </div>` : ""}
+        </div>` : ''}
 
         <button onclick="navigate('history')" class="w-full ios-card p-6 flex items-center gap-4 active:scale-95 transition-all">
           <div class="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500"><i data-lucide="history"></i></div>
@@ -272,37 +396,37 @@
       `;
     }
 
-    else if (state.view === "managers") {
+    else if (state.view === 'managers') {
       title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
       Object.keys(dataTU).sort().forEach(m => {
         container.innerHTML += `<button onclick="state.manager='${m}';navigate('restaurants')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${m}</span> <i data-lucide="chevron-right" class="opacity-30"></i></button>`;
       });
     }
 
-    else if (state.view === "restaurants") {
+    else if (state.view === 'restaurants') {
       title.innerText = "Ресторан";
       (dataTU[state.manager] || []).forEach(r => {
         container.innerHTML += `<button onclick="state.restaurant='${r}';navigate('reasons')" class="w-full p-4 mb-2 ios-card text-left text-xs font-semibold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
 
-    else if (state.view === "reasons") {
+    else if (state.view === 'reasons') {
       title.innerText = "Причина";
       ["Внешние факторы","Отсутствие продукта","Персонал","Внутренние факторы"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')" class="w-full p-5 mb-3 ios-card text-left font-bold flex justify-between items-center active:bg-white/5"><span>${r}</span> <i data-lucide="chevron-right" class="opacity-20"></i></button>`;
       });
     }
 
-    else if (state.view === "comment") {
+    else if (state.view === 'comment') {
       title.innerText = "Комментарий";
-      container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ""}</textarea></div>`;
-      footer.classList.remove("hidden");
-      document.getElementById("primary-btn").innerText = "Далее";
-      document.getElementById("primary-btn").onclick = () => { state.comment = document.getElementById("comm").value; navigate("calendar"); };
+      container.innerHTML = `<div class="ios-card p-2"><textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea></div>`;
+      footer.classList.remove('hidden');
+      document.getElementById('primary-btn').innerText = "Далее";
+      document.getElementById('primary-btn').onclick = () => { state.comment = document.getElementById('comm').value; navigate('calendar'); };
     }
 
-    else if (state.view === "calendar") {
-      const isStart = state.stage === "start";
+    else if (state.view === 'calendar') {
+      const isStart = state.stage === 'start';
       const cur = isStart ? state.start : state.end;
       title.innerText = isStart ? "Начало" : "Конец";
 
@@ -315,7 +439,7 @@
           <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
             <p class="text-[8px] uppercase font-black text-blue-500 mb-1 tracking-widest">Начало</p>
             <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${pad2(state.start.hour)}:${pad2(state.start.min)}</p>
-          </div>` : ""}
+          </div>` : ''}
 
           <div class="flex justify-between items-center mb-6">
             <span class="text-lg font-bold">${cur.day} ${monthNamesGenitive[cur.month]}</span>
@@ -324,41 +448,41 @@
 
           <div class="flex gap-2 mb-6 justify-center">
             <select onchange="updateFlowDate('month', this.value)" class="ios-select">
-              ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? "selected" : ""}>${m}</option>`).join("")}
+              ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
             <select onchange="updateFlowDate('year', this.value)" class="ios-select">
-              ${[2024,2025,2026].map(y => `<option value="${y}" ${y === cur.year ? "selected" : ""}>${y}</option>`).join("")}
+              ${[2024,2025,2026].map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
             </select>
           </div>
 
           <div class="cal-grid">
-            ${["П","В","С","Ч","П","С","В"].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join("")}
-            ${Array.from({length:firstDay}).map(() => `<div></div>`).join("")}
-            ${Array.from({length:daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?"selected":""}">${i+1}</div>`).join("")}
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+            ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
+            ${Array.from({length:daysInMonth}).map((_, i) => `<div onclick="setDay(${i+1})" class="day-btn ${i+1===cur.day?'selected':''}">${i+1}</div>`).join('')}
           </div>
         </div>
       `;
 
       initWheels(cur);
-      footer.classList.remove("hidden");
-      document.getElementById("primary-btn").innerText = isStart ? "Установить конец" : "Далее";
-      document.getElementById("primary-btn").onclick = () => {
+      footer.classList.remove('hidden');
+      document.getElementById('primary-btn').innerText = isStart ? "Установить конец" : "Далее";
+      document.getElementById('primary-btn').onclick = () => {
         const v = getWheels();
         if (isStart) {
           state.start.hour=v.h; state.start.min=v.m;
           state.start.ts = new Date(state.start.year, state.start.month, state.start.day, state.start.hour, state.start.min).getTime();
-          state.stage="end";
+          state.stage='end';
           state.end=JSON.parse(JSON.stringify(state.start));
           render();
         } else {
           state.end.hour=v.h; state.end.min=v.m;
           state.end.ts = new Date(state.end.year, state.end.month, state.end.day, state.end.hour, state.end.min).getTime();
-          navigate("sum");
+          navigate('sum');
         }
       };
     }
 
-    else if (state.view === "sum") {
+    else if (state.view === 'sum') {
       title.innerText = "Сумма";
       container.innerHTML = `
         <div class="ios-card p-4 mb-4 border-l-4 border-blue-500">
@@ -371,21 +495,21 @@
         </div>
 
         <div class="flex flex-col items-center py-12">
-          <input type="number" id="sum-input" placeholder="0" value="${state.amount || ""}" class="text-6xl font-black" oninput="scaleSumInput(this)">
+          <input type="number" id="sum-input" placeholder="0" value="${state.amount || ''}" class="text-6xl font-black" oninput="scaleSumInput(this)">
           <p class="text-[10px] text-gray-500 font-black uppercase mt-4 tracking-widest">Сумма потерь ₸</p>
         </div>
       `;
-      footer.classList.remove("hidden");
-      document.getElementById("primary-btn").innerText = state.editId ? "Сохранить" : "Завершить";
-      document.getElementById("primary-btn").onclick = saveReport;
-      setTimeout(() => { const inp=document.getElementById("sum-input"); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
+      footer.classList.remove('hidden');
+      document.getElementById('primary-btn').innerText = state.editId ? "Сохранить" : "Завершить";
+      document.getElementById('primary-btn').onclick = saveReport;
+      setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 100);
     }
 
-    else if (state.view === "analytics_period") {
+    else if (state.view === 'analytics_period') {
       title.innerText = "Аналитика";
-      [{id:"today",n:"Сегодня"},{id:"week",n:"Эта неделя"},{id:"custom",n:"Свой диапазон"},{id:"all",n:"Весь период"}]
+      [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}]
       .forEach(opt => {
-        const handler = (opt.id === "custom")
+        const handler = (opt.id === 'custom')
           ? "navigate('analytics_custom')"
           : `state.filter='${opt.id}';navigate('analytics_view')`;
 
@@ -398,7 +522,7 @@
       });
     }
 
-    else if (state.view === "analytics_custom") {
+    else if (state.view === 'analytics_custom') {
       title.innerText = "Период";
       const cal = state.analyticsCal;
       const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
@@ -413,30 +537,29 @@
           </div>
 
           <div class="cal-grid">
-            ${["П","В","С","Ч","П","С","В"].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join("")}
-            ${Array.from({length:firstDay}).map(() => `<div></div>`).join("")}
+            ${['П','В','С','Ч','П','С','В'].map(d => `<div class="text-[10px] text-gray-600 font-bold text-center">${d}</div>`).join('')}
+            ${Array.from({length:firstDay}).map(() => `<div></div>`).join('')}
             ${Array.from({length:daysInMonth}).map((_, i) => {
               const ts = new Date(cal.year, cal.month, i+1).getTime();
               const sel = (cal.start && ts === cal.start) || (cal.end && ts === cal.end);
               const rng = cal.start && cal.end && ts > cal.start && ts < cal.end;
-              return `<div onclick="setAnalyticsDate(${ts})" class="day-btn ${sel?"selected":""} ${rng?"range":""}">${i+1}</div>`;
-            }).join("")}
+              return `<div onclick="setAnalyticsDate(${ts})" class="day-btn ${sel?'selected':''} ${rng?'range':''}">${i+1}</div>`;
+            }).join('')}
           </div>
         </div>
       `;
 
-      // FIX #3: кнопка "Показать" всегда активна, без залипания
       if (cal.start && cal.end) {
-        footer.classList.remove("hidden");
-        laterBtn.classList.add("hidden");
-        const btn = document.getElementById("primary-btn");
+        footer.classList.remove('hidden');
+        laterBtn.classList.add('hidden');
+        const btn = document.getElementById('primary-btn');
         btn.innerText = "Показать";
-        btn.onclick = () => { state.filter="custom"; navigate("analytics_view"); };
+        btn.onclick = () => { state.filter='custom'; navigate('analytics_view'); };
         setPrimaryDisabled(false);
       }
     }
 
-    else if (state.view === "analytics_view") {
+    else if (state.view === 'analytics_view') {
       title.innerText = "Итоги";
       const filtered = filterAnalytics(db.reports);
       const totalSum = filtered.reduce((a, b) => a + b.amount, 0);
@@ -457,12 +580,12 @@
         </div>
 
         <div class="space-y-4 pb-24">
-          ${state.analyticsTab === "restaurants" ? renderRestList(filtered, totalSum) : renderReasonList(filtered, totalSum)}
+          ${state.analyticsTab === 'restaurants' ? renderRestList(filtered, totalSum) : renderReasonList(filtered, totalSum)}
         </div>
       `;
     }
 
-    else if (state.view === "history") {
+    else if (state.view === 'history') {
       title.innerText = "История";
 
       if (!db.reports.length) {
@@ -475,7 +598,7 @@
                 <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">${r.manager}</span>
                 <span class="text-sm font-black text-red-500">${Number(r.amount).toLocaleString()} ₸</span>
               </div>
-              <p class="text-xs font-bold truncate">${(r.restaurant || "").split(" — ")[1] || r.restaurant}</p>
+              <p class="text-xs font-bold truncate">${(r.restaurant || '').split(' — ')[1] || r.restaurant}</p>
               <p class="text-[8px] text-gray-500 uppercase font-bold mt-2">
                 ${pad2(r.start.day)}.${pad2(r.start.month+1)} ${pad2(r.start.hour)}:${pad2(r.start.min)}
                 —
@@ -491,7 +614,7 @@
                 </button>
               </div>
             </div>
-          `).join("")}
+          `).join('')}
         </div>`;
       }
     }
@@ -507,8 +630,8 @@
       return `<div class="ios-card p-4">
         <div class="flex justify-between items-start mb-1">
           <div class="flex flex-col max-w-[70%]">
-            <span class="text-xs font-bold truncate">${(name || "").includes(" — ") ? name.split(" — ")[1] : name}</span>
-            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || "").includes(" — ") ? name.split(" — ")[0] : ""}</span>
+            <span class="text-xs font-bold truncate">${(name || '').includes(' — ') ? name.split(' — ')[1] : name}</span>
+            <span class="text-[9px] text-gray-500 font-bold uppercase">${(name || '').includes(' — ') ? name.split(' — ')[0] : ''}</span>
           </div>
           <div class="text-right flex flex-col items-end">
             <span class="text-sm font-black">${sum.toLocaleString()} ₸</span>
@@ -517,7 +640,7 @@
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
-    }).join("") || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
   }
 
   function renderReasonList(reports, total) {
@@ -535,35 +658,35 @@
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${perc}%"></div></div>
       </div>`;
-    }).join("") || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
+    }).join('') || '<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных.</p>';
   }
 
   function saveDraft() {
-    if (state.view === "calendar") {
+    if (state.view === 'calendar') {
       const v = getWheels();
-      if (state.stage === "start") { state.start.hour=v.h; state.start.min=v.m; }
+      if (state.stage === 'start') { state.start.hour=v.h; state.start.min=v.m; }
       else { state.end.hour=v.h; state.end.min=v.m; }
     }
-    if (state.view === "comment") state.comment = document.getElementById("comm").value;
-    if (state.view === "sum") state.amount = parseInt(document.getElementById("sum-input").value) || 0;
+    if (state.view === 'comment') state.comment = document.getElementById('comm').value;
+    if (state.view === 'sum') state.amount = parseInt(document.getElementById('sum-input').value) || 0;
 
-    if (!state.draftId) state.draftId = "d_" + Date.now();
+    if (!state.draftId) state.draftId = 'd_' + Date.now();
     const idx = db.drafts.findIndex(d => d.draftId === state.draftId);
     if (idx !== -1) db.drafts[idx] = JSON.parse(JSON.stringify(state));
     else db.drafts.push(JSON.parse(JSON.stringify(state)));
 
     saveDraftsToLS();
-    state.view="main"; historyStack=["main"]; render();
+    state.view='main'; historyStack=['main']; render();
   }
 
   function resumeDraft(id) {
     const d = db.drafts.find(it => it.draftId === id);
     if (d) {
       state = JSON.parse(JSON.stringify(d));
-      state.view="calendar";
-      state.stage="end";
+      state.view='calendar';
+      state.stage='end';
       if (!state.end) state.end = JSON.parse(JSON.stringify(state.start));
-      historyStack=["main","calendar"];
+      historyStack=['main','calendar'];
       render();
     }
   }
@@ -586,8 +709,8 @@
     setPrimaryDisabled(true);
 
     try {
-      const val = parseInt(document.getElementById("sum-input").value) || 0;
-      if (val <= 0) { saving=false; setPrimaryDisabled(false); return; }
+      const val = parseInt(document.getElementById('sum-input').value) || 0;
+      if (val <= 0) { saving = false; setPrimaryDisabled(false); return; }
 
       state.amount = val;
 
@@ -603,7 +726,7 @@
         amount: state.amount,
         start: startStr,
         end: endStr,
-        comment: state.comment || "-",
+        comment: state.comment || '-',
         request_id: state.requestId
       };
 
@@ -621,14 +744,9 @@
         saveDraftsToLS();
       }
 
-      state.view="main";
-      state.editId=null;
-      state.requestId=null;
-      historyStack=["main"];
-      render();
-
+      state.view='main'; historyStack=['main']; state.editId=null; state.requestId=null; render();
     } catch (e) {
-      alert(`Ошибка: ${e?.message || "unknown"}`);
+      alert(`Ошибка: ${e?.message || 'unknown'}`);
     } finally {
       saving = false;
       setPrimaryDisabled(false);
@@ -640,24 +758,24 @@
     if (!r) return;
 
     state = {
-      view:"comment",
+      view:'comment',
       manager: r.manager,
       restaurant: r.restaurant,
       reason: r.reason,
-      comment: r.comment || "",
+      comment: r.comment || '',
       start: JSON.parse(JSON.stringify(r.start)),
       end: JSON.parse(JSON.stringify(r.end)),
-      stage:"start",
+      stage:'start',
       amount: r.amount || 0,
       filter: state.filter,
       analyticsCal: state.analyticsCal,
-      analyticsTab: state.analyticsTab || "restaurants",
+      analyticsTab: state.analyticsTab || 'restaurants',
       draftId: null,
       editId: id,
       requestId: null
     };
 
-    historyStack = ["main","history","comment"];
+    historyStack = ['main','history','comment'];
     render();
   }
 
@@ -674,26 +792,26 @@
 
   function startFlow() {
     state = {
-      view:"managers",
-      manager:"", restaurant:"", reason:"", comment:"",
+      view:'managers',
+      manager:'', restaurant:'', reason:'', comment:'',
       start:getNowObj(),
       end:getNowObj(),
-      stage:"start",
+      stage:'start',
       amount:0,
       filter: state.filter,
       analyticsCal: state.analyticsCal,
-      analyticsTab: "restaurants",
+      analyticsTab: 'restaurants',
       draftId: null,
       editId: null,
       requestId: null
     };
-    navigate("managers");
+    navigate('managers');
   }
 
   function navigate(v){ historyStack.push(v); state.view=v; render(); }
   function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
-  function setDay(d){ if(state.stage==="start") state.start.day=d; else state.end.day=d; render(); }
-  function updateFlowDate(p,v){ const cur=state.stage==="start"?state.start:state.end; cur[p]=parseInt(v); render(); }
+  function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
+  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
 
   function setAnalyticsDate(ts){
     if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
@@ -714,9 +832,9 @@
 
   function scaleSumInput(input){
     const val=input.value;
-    if(val.length>7) input.style.fontSize="32px";
-    else if(val.length>5) input.style.fontSize="44px";
-    else input.style.fontSize="60px";
+    if(val.length>7) input.style.fontSize='32px';
+    else if(val.length>5) input.style.fontSize='44px';
+    else input.style.fontSize='60px';
   }
 
   function filterAnalytics(reports){
@@ -726,15 +844,15 @@
     return reports.filter(r => {
       const ts = r.start?.ts || r.created_at || 0;
 
-      if(state.filter==="today") return ts >= startOfToday;
+      if(state.filter==='today') return ts >= startOfToday;
 
-      if(state.filter==="week") {
-        const dow = (now.getDay() || 7) - 1;
+      if(state.filter==='week') {
+        const dow = (now.getDay() || 7) - 1; // 0..6
         const startOfWeek = startOfToday - dow * 86400000;
         return ts >= startOfWeek;
       }
 
-      if(state.filter==="custom") {
+      if(state.filter==='custom') {
         if (!state.analyticsCal.start || !state.analyticsCal.end) return true;
         return ts >= state.analyticsCal.start && ts <= (state.analyticsCal.end + 86400000);
       }
@@ -745,15 +863,15 @@
 
   function initWheels(t){
     setTimeout(() => {
-      const h=document.getElementById("h-w"), m=document.getElementById("m-w");
+      const h=document.getElementById('h-w'), m=document.getElementById('m-w');
       if(!h || !m) return;
-      h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join("");
-      m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join("");
+      h.innerHTML=Array.from({length:24},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
+      m.innerHTML=Array.from({length:60},(_,i)=>`<div class="wheel-item">${pad2(i)}</div>`).join('');
       h.scrollTop=t.hour*52; m.scrollTop=t.min*52;
 
       const sync=(el)=>{
         const idx=Math.round(el.scrollTop/52);
-        el.querySelectorAll(".wheel-item").forEach((it,i)=>it.classList.toggle("active", i===idx));
+        el.querySelectorAll('.wheel-item').forEach((it,i)=>it.classList.toggle('active', i===idx));
       };
       h.onscroll=()=>sync(h); m.onscroll=()=>sync(m);
       sync(h); sync(m);
@@ -761,11 +879,11 @@
   }
 
   function getWheels(){
-    const h=document.getElementById("h-w"), m=document.getElementById("m-w");
+    const h=document.getElementById('h-w'), m=document.getElementById('m-w');
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  window.addEventListener("load", async () => {
+  window.addEventListener('load', async () => {
     try {
       await loadReportsFromServer();
     } catch (e) {
