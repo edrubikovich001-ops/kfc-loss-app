@@ -1200,15 +1200,15 @@
     const h = window.innerHeight || 1;
     const nx = (clientX / w - 0.5);
     const ny = (clientY / h - 0.5);
-    pointerX = nx * 22;
-    pointerY = ny * 22;
+    pointerX = nx * 22;  // px
+    pointerY = ny * 22;  // px
   }
 
   function setParallaxFromScroll(){
     const main = document.getElementById('view-container');
     if(!main) return 0;
     const s = main.scrollTop || 0;
-    return -(s * 0.02);
+    return -(s * 0.02); // subtle
   }
 
   function rafParallax(){
@@ -1232,7 +1232,7 @@
 
   window.addEventListener('load', () => {
     try {
-      render();
+      render(); // UI сразу
 
       const main = document.getElementById('view-container');
       if(main){
