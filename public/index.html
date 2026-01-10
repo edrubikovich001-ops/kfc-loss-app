@@ -17,12 +17,16 @@
       --kfc-red:#E4002B;
       --item-height:52px;
 
-      --glass-text: rgba(255,255,255,.92);
-
-      /* Параллакс-сдвиги */
+      /* Параллакс от пальца */
       --px: 0px;
       --py: 0px;
-      --ps: 0px; /* scroll */
+      --ps: 0px;
+
+      /* Автоволна (всегда) */
+      --ax: 0px;
+      --ay: 0px;
+      --aw: 0.12;   /* wave intensity */
+      --shine: 0.14;/* wave brightness */
 
       /* Spotlight */
       --sx: 50%;
@@ -32,7 +36,7 @@
       /* Live lens per-card */
       --lx: 50%;
       --ly: 40%;
-      --lpress: 0; /* 0..1 */
+      --lpress: 0;
     }
 
     html,body{height:100%;}
@@ -46,113 +50,151 @@
       user-select:none;
     }
 
-    /* ===== ДИНАМИЧНЫЙ ФОН ===== */
-    #bg {
+    /* ===== ДИНАМИЧНЫЙ ФОН (всегда “живой”) ===== */
+    #bg{
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
       background:
-        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.22), transparent 60%),
-        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.22), transparent 60%),
-        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.18), transparent 60%),
-        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.22), transparent 60%),
-        linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.78));
+        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.20), transparent 60%),
+        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.20), transparent 60%),
+        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.16), transparent 60%),
+        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.20), transparent 60%),
+        linear-gradient(180deg, rgba(0,0,0,.50), rgba(0,0,0,.80));
     }
+
     #bg::before, #bg::after{
       content:"";
       position:absolute;
       inset:-30%;
       background:
-        radial-gradient(closest-side at 22% 34%, rgba(42,109,187,.35), transparent 55%),
-        radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.32), transparent 55%),
-        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.26), transparent 58%),
-        radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.32), transparent 58%);
-      filter: blur(22px) saturate(120%);
-      opacity: .95;
-      transform: translate3d(0,0,0);
+        radial-gradient(closest-side at 22% 34%, rgba(42,109,187,.38), transparent 55%),
+        radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.36), transparent 55%),
+        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.30), transparent 58%),
+        radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.36), transparent 58%);
+      filter: blur(20px) saturate(130%);
+      opacity: .98;
       will-change: transform, filter, opacity;
-      animation: auroraMove 10s ease-in-out infinite alternate;
-    }
-    #bg::after{
-      opacity:.75;
-      filter: blur(34px) saturate(130%);
-      animation: auroraMove2 14s ease-in-out infinite alternate;
-      mix-blend-mode: screen;
+      transform: translate3d(0,0,0);
     }
 
-    /* Параллакс */
+    /* Слой 1: сильнее и быстрее */
     #bg::before{
+      mix-blend-mode: screen;
+      animation: auroraFlowA 7.6s ease-in-out infinite;
       transform:
-        translate3d(calc(var(--px) * 0.60 + var(--ps) * 0.10), calc(var(--py) * 0.60 + var(--ps) * 0.25), 0)
-        scale(1.02);
-    }
-    #bg::after{
-      transform:
-        translate3d(calc(var(--px) * 0.85 + var(--ps) * 0.15), calc(var(--py) * 0.85 + var(--ps) * 0.35), 0)
-        scale(1.04);
+        translate3d(
+          calc(var(--px) * 0.55 + var(--ps) * 0.10 + var(--ax) * 1.00),
+          calc(var(--py) * 0.55 + var(--ps) * 0.22 + var(--ay) * 1.00),
+          0
+        )
+        scale(1.03);
     }
 
+    /* Слой 2: мягче, глубже */
+    #bg::after{
+      opacity:.78;
+      filter: blur(32px) saturate(140%);
+      mix-blend-mode: screen;
+      animation: auroraFlowB 10.5s ease-in-out infinite;
+      transform:
+        translate3d(
+          calc(var(--px) * 0.85 + var(--ps) * 0.18 + var(--ax) * 1.35),
+          calc(var(--py) * 0.85 + var(--ps) * 0.32 + var(--ay) * 1.35),
+          0
+        )
+        scale(1.05);
+    }
+
+    /* Волнообразная яркость */
+    #bg-pulse{
+      position:fixed; inset:-15%; z-index:2; pointer-events:none;
+      background:
+        radial-gradient(700px 520px at 30% 30%, rgba(255,255,255,.14), transparent 60%),
+        radial-gradient(820px 600px at 70% 35%, rgba(120,170,255,.16), transparent 62%),
+        radial-gradient(920px 700px at 60% 80%, rgba(255,42,74,.10), transparent 65%);
+      mix-blend-mode: screen;
+      filter: blur(10px);
+      will-change: transform, opacity;
+      opacity: calc(0.10 + var(--shine));
+      animation: pulseWave 4.2s ease-in-out infinite;
+      transform:
+        translate3d(
+          calc(var(--px) * 0.50 + var(--ax) * 1.10),
+          calc(var(--py) * 0.50 + var(--ay) * 1.10),
+          0
+        );
+    }
+
+    /* Полосы: заметнее + переливы волной */
     #bg-lines{
       position:fixed; inset:0; z-index:1; pointer-events:none;
-      opacity:.12;
-      background: repeating-linear-gradient(135deg,
-        rgba(255,255,255,.08) 0px,
-        rgba(255,255,255,.08) 1px,
-        transparent 1px,
-        transparent 34px);
-      mask-image: radial-gradient(650px 650px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0));
-      will-change: transform, opacity;
-      transform: translate3d(calc(var(--px) * 0.35), calc(var(--py) * 0.35), 0);
-      animation: linesDrift 16s linear infinite;
+      opacity:.22; /* заметнее */
+      background:
+        repeating-linear-gradient(
+          135deg,
+          rgba(255,255,255,.20) 0px,
+          rgba(255,255,255,.20) 1px,
+          transparent 1px,
+          transparent 26px
+        );
+      mask-image: radial-gradient(750px 750px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0));
+      will-change: transform, opacity, filter, background-position;
+      background-size: 200% 200%;
+      animation: linesWave 3.8s ease-in-out infinite;
+      transform:
+        translate3d(
+          calc(var(--px) * 0.30 + var(--ax) * 0.70),
+          calc(var(--py) * 0.30 + var(--ay) * 0.70),
+          0
+        );
+      mix-blend-mode: overlay;
     }
 
     #bg-noise{
       position:fixed; inset:0; z-index:2; pointer-events:none;
-      opacity:.09;
+      opacity:.08;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='https://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
       mix-blend-mode: overlay;
       will-change: transform, opacity;
-      transform: translate3d(calc(var(--px) * 0.18), calc(var(--py) * 0.18), 0);
       animation: noiseMove 6s steps(6) infinite;
+      transform: translate3d(calc(var(--ax) * 0.30), calc(var(--ay) * 0.30), 0);
     }
 
-    /* Волнообразная яркость/свечение (чтобы фон НЕ "зависал") */
-    #bg-pulse{
-      position:fixed; inset:-15%; z-index:2; pointer-events:none;
-      opacity:.0;
-      background:
-        radial-gradient(700px 520px at 30% 30%, rgba(255,255,255,.12), transparent 60%),
-        radial-gradient(820px 600px at 70% 35%, rgba(120,170,255,.14), transparent 62%),
-        radial-gradient(920px 700px at 60% 80%, rgba(255,42,74,.08), transparent 65%);
-      mix-blend-mode: screen;
-      filter: blur(8px);
-      will-change: transform, opacity;
-      animation: pulseWave 4.6s ease-in-out infinite;
-      transform: translate3d(calc(var(--px) * 0.55), calc(var(--py) * 0.55), 0);
+    @keyframes auroraFlowA{
+      0%   { filter: blur(19px) saturate(130%); opacity:.92; }
+      50%  { filter: blur(22px) saturate(155%); opacity:1; }
+      100% { filter: blur(19px) saturate(140%); opacity:.95; }
     }
-
+    @keyframes auroraFlowB{
+      0%   { filter: blur(32px) saturate(140%); opacity:.70; }
+      50%  { filter: blur(38px) saturate(165%); opacity:.92; }
+      100% { filter: blur(32px) saturate(150%); opacity:.74; }
+    }
     @keyframes pulseWave{
-      0%   { opacity: .06; transform: translate3d(calc(var(--px) * 0.55 - 10px), calc(var(--py) * 0.55 + 6px), 0) scale(1.02); }
-      50%  { opacity: .16; transform: translate3d(calc(var(--px) * 0.55 + 14px), calc(var(--py) * 0.55 - 10px), 0) scale(1.05); }
-      100% { opacity: .08; transform: translate3d(calc(var(--px) * 0.55 - 8px), calc(var(--py) * 0.55 + 10px), 0) scale(1.03); }
+      0%   { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 - 10px), calc(var(--py) * 0.50 + var(--ay) * 1.10 + 8px), 0) scale(1.02); }
+      50%  { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 + 18px), calc(var(--py) * 0.50 + var(--ay) * 1.10 - 12px), 0) scale(1.06); }
+      100% { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 - 8px), calc(var(--py) * 0.50 + var(--ay) * 1.10 + 12px), 0) scale(1.03); }
     }
 
-    @keyframes auroraMove{
-      0%   { filter: blur(22px) saturate(120%); opacity:.92; }
-      50%  { filter: blur(24px) saturate(135%); opacity:1; }
-      100% { filter: blur(22px) saturate(125%); opacity:.95; }
-    }
-    @keyframes auroraMove2{
-      0%   { filter: blur(34px) saturate(130%); opacity:.68; }
-      50%  { filter: blur(38px) saturate(145%); opacity:.86; }
-      100% { filter: blur(34px) saturate(135%); opacity:.72; }
-    }
-    @keyframes linesDrift{
-      0% { transform: translate3d(calc(var(--px) * 0.35), calc(var(--py) * 0.35), 0); opacity:.10; }
-      50% { opacity:.14; }
-      100% { transform: translate3d(calc(var(--px) * 0.35 - 40px), calc(var(--py) * 0.35 + 40px), 0); opacity:.11; }
+    @keyframes linesWave{
+      0%{
+        opacity:.18;
+        filter: blur(0px) brightness(1.00);
+        background-position: 0% 50%;
+      }
+      50%{
+        opacity:.28;
+        filter: blur(.2px) brightness(1.18);
+        background-position: 100% 50%;
+      }
+      100%{
+        opacity:.20;
+        filter: blur(0px) brightness(1.04);
+        background-position: 0% 50%;
+      }
     }
     @keyframes noiseMove{
-      0%{ transform: translate3d(calc(var(--px) * 0.18), calc(var(--py) * 0.18), 0); }
-      100%{ transform: translate3d(calc(var(--px) * 0.18 - 40px), calc(var(--py) * 0.18 + 20px), 0); }
+      0%{ transform: translate3d(calc(var(--ax) * 0.30), calc(var(--ay) * 0.30), 0); }
+      100%{ transform: translate3d(calc(var(--ax) * 0.30 - 40px), calc(var(--ay) * 0.30 + 20px), 0); }
     }
 
     /* ===== SPOTLIGHT под пальцем ===== */
@@ -169,15 +211,8 @@
       mix-blend-mode: screen;
     }
 
-    /* ===== "ЖИДКОЕ СТЕКЛО" ТЕКСТ ===== */
-    .glass-ui h1,
-    .glass-ui h2,
-    .glass-ui h3,
-    .glass-ui p,
-    .glass-ui span,
-    .glass-ui button,
-    .glass-ui label,
-    .glass-ui small{
+    /* ===== “жидкое стекло” текст ===== */
+    .glass-ui h1,.glass-ui h2,.glass-ui h3,.glass-ui p,.glass-ui span,.glass-ui button,.glass-ui label,.glass-ui small{
       color: rgba(255,255,255,.92);
       text-shadow:
         0 0 10px rgba(255,255,255,.08),
@@ -185,36 +220,20 @@
         0 1px 0 rgba(0,0,0,.35);
       -webkit-text-stroke: 0.2px rgba(255,255,255,.08);
     }
-    .glass-ui input,
-    .glass-ui textarea{
-      -webkit-text-stroke: 0;
-      text-shadow: none;
-    }
+    .glass-ui input,.glass-ui textarea{ -webkit-text-stroke: 0; text-shadow:none; }
+
     .glass-shimmer{
-      background: linear-gradient(90deg,
-        rgba(255,255,255,.70),
-        rgba(180,220,255,.88),
-        rgba(255,255,255,.60),
-        rgba(255,255,255,.78)
-      );
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      background: linear-gradient(90deg, rgba(255,255,255,.70), rgba(180,220,255,.90), rgba(255,255,255,.60), rgba(255,255,255,.78));
+      -webkit-background-clip:text; background-clip:text;
+      color:transparent;
       background-size: 240% 100%;
-      animation: shimmer 6.5s ease-in-out infinite;
-      text-shadow:
-        0 0 10px rgba(255,255,255,.06),
-        0 0 20px rgba(120,170,255,.10),
-        0 1px 0 rgba(0,0,0,.35);
+      animation: shimmer 6.2s ease-in-out infinite;
+      text-shadow: 0 0 10px rgba(255,255,255,.06), 0 0 20px rgba(120,170,255,.10), 0 1px 0 rgba(0,0,0,.35);
       -webkit-text-stroke: 0.25px rgba(255,255,255,.08);
     }
-    @keyframes shimmer{
-      0%{ background-position: 0% 50%; }
-      50%{ background-position: 100% 50%; }
-      100%{ background-position: 0% 50%; }
-    }
+    @keyframes shimmer{ 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
 
-    /* ===== КАРТОЧКИ: микро-анимации + glow + ЖИВОЙ КОНТУР ===== */
+    /* ===== Карточки + glow + border ===== */
     .ios-card{
       background:rgba(28,28,30,.82);
       border-radius:16px;
@@ -223,39 +242,21 @@
       position:relative;
       overflow:hidden;
     }
-
-    /* Живой градиентный контур */
-    .ios-card.border-live{
-      border:1px solid rgba(255,255,255,.10);
-    }
     .ios-card.border-live::before{
       content:"";
-      position:absolute;
-      inset:-1px;
+      position:absolute; inset:-1px;
       border-radius:18px;
       padding:1px;
-      background: linear-gradient(120deg,
-        rgba(255,42,74,.70),
-        rgba(120,170,255,.55),
-        rgba(34,197,94,.45),
-        rgba(255,255,255,.18),
-        rgba(255,42,74,.55)
-      );
+      background: linear-gradient(120deg, rgba(255,42,74,.70), rgba(120,170,255,.55), rgba(34,197,94,.45), rgba(255,255,255,.18), rgba(255,42,74,.55));
       background-size: 240% 240%;
-      animation: borderFlow 8.5s ease-in-out infinite;
-      -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
+      animation: borderFlow 8.2s ease-in-out infinite;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
       -webkit-mask-composite: xor;
       mask-composite: exclude;
       opacity: .55;
       pointer-events:none;
     }
-    @keyframes borderFlow{
-      0%{ background-position: 0% 50%; }
-      50%{ background-position: 100% 50%; }
-      100%{ background-position: 0% 50%; }
-    }
+    @keyframes borderFlow{ 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
 
     .ios-card::after{
       content:"";
@@ -265,13 +266,14 @@
                   radial-gradient(500px 260px at 85% 30%, rgba(120,170,255,.10), transparent 60%),
                   radial-gradient(600px 260px at 55% 90%, rgba(255,42,74,.07), transparent 60%);
       opacity:0;
-      transition: opacity .25s ease;
+      transition: opacity .20s ease;
       pointer-events:none;
       mix-blend-mode: screen;
     }
     .card-anim{
-      transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease, filter .22s ease;
+      transition: transform .14s ease, box-shadow .18s ease, border-color .18s ease;
       box-shadow: 0 12px 30px rgba(0,0,0,.35);
+      will-change: transform;
     }
     .card-anim:hover{
       transform: translateY(-2px);
@@ -285,91 +287,57 @@
     }
     .card-anim:active::after{ opacity:.75; }
 
-    /* ===== ЖИВАЯ ЛИНЗА (рефракция/искажение) ===== */
-    .lens-card{
-      --lx: 50%;
-      --ly: 40%;
-      --lpress: 0;
-      isolation:isolate;
-    }
+    /* ===== Живая линза ===== */
+    .lens-card{ isolation:isolate; }
     .lens-card .lens-layer{
-      position:absolute;
-      inset:-2px;
+      position:absolute; inset:-2px;
       border-radius:18px;
       pointer-events:none;
       z-index:2;
       opacity:.0;
-      transition: opacity .18s ease;
+      transition: opacity .14s ease;
     }
-    .lens-card::marker{ content:""; }
-
-    /* “Линза”: мягкая рефракция + микротекстура */
     .lens-card .lens-layer::before{
       content:"";
-      position:absolute;
-      inset:0;
+      position:absolute; inset:0;
       border-radius:18px;
       background:
-        radial-gradient(520px 380px at var(--lx) var(--ly),
-          rgba(255,255,255,.18),
-          rgba(120,170,255,.12) 28%,
-          rgba(255,42,74,.08) 46%,
-          transparent 68%),
-        repeating-linear-gradient(135deg,
-          rgba(255,255,255,.06) 0px,
-          rgba(255,255,255,.06) 1px,
-          transparent 1px,
-          transparent 14px);
+        radial-gradient(520px 380px at var(--lx) var(--ly), rgba(255,255,255,.18), rgba(120,170,255,.12) 28%, rgba(255,42,74,.08) 46%, transparent 68%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0px, rgba(255,255,255,.06) 1px, transparent 1px, transparent 14px);
       mix-blend-mode: screen;
       opacity: .85;
-      filter: blur(0px);
-      transform: translate3d(0,0,0);
     }
-
-    /* Прям “искажение”: имитируем refraction смещением блика + сильным blur backdrop */
     .lens-card .lens-layer::after{
       content:"";
-      position:absolute;
-      inset:0;
+      position:absolute; inset:0;
       border-radius:18px;
-      background:
-        radial-gradient(420px 260px at calc(var(--lx) + 6%) calc(var(--ly) + 4%),
-          rgba(255,255,255,.10),
-          transparent 62%);
+      background: radial-gradient(420px 260px at calc(var(--lx) + 6%) calc(var(--ly) + 4%), rgba(255,255,255,.10), transparent 62%);
       backdrop-filter: blur(18px) saturate(160%) contrast(110%);
       -webkit-backdrop-filter: blur(18px) saturate(160%) contrast(110%);
       opacity:.75;
-      transform:
-        translate3d(calc((var(--lpress) * 0.6px)), calc((var(--lpress) * 0.6px)), 0);
+      transform: translate3d(calc((var(--lpress) * 0.6px)), calc((var(--lpress) * 0.6px)), 0);
     }
-
-    /* Когда наводим/двигаем — линза включается */
     .lens-card:hover .lens-layer{ opacity:.40; }
     .lens-card:active .lens-layer{ opacity:.55; }
+    @media (hover:none){ .lens-card .lens-layer{ opacity:.18; } .lens-card:active .lens-layer{ opacity:.42; } }
 
-    /* На телефоне (touch) — делаем линзу заметнее */
-    @media (hover: none) {
-      .lens-card .lens-layer{ opacity:.18; }
-      .lens-card:active .lens-layer{ opacity:.42; }
-    }
-
-    /* ===== КНОПКИ "ЖИДКИЕ" ===== */
+    /* ===== Кнопки “жидкие” ===== */
     .btn-liquid{
       position:relative;
       overflow:hidden;
       border:1px solid rgba(255,255,255,.12);
       backdrop-filter: blur(14px);
-      transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+      transition: transform .12s ease, box-shadow .16s ease, border-color .16s ease;
+      will-change: transform;
     }
     .btn-liquid::before{
       content:"";
-      position:absolute;
-      inset:-40%;
+      position:absolute; inset:-40%;
       background: radial-gradient(closest-side at 30% 30%, rgba(255,255,255,.25), transparent 60%),
                   radial-gradient(closest-side at 70% 40%, rgba(120,170,255,.18), transparent 65%);
       opacity:.0;
       transform: translate3d(-10%, -10%, 0);
-      transition: opacity .18s ease, transform .25s ease;
+      transition: opacity .14s ease, transform .18s ease;
       pointer-events:none;
       mix-blend-mode: screen;
     }
@@ -385,24 +353,23 @@
       opacity:0;
       pointer-events:none;
     }
-    .btn-liquid:hover{
-      border-color: rgba(255,255,255,.18);
-      box-shadow: 0 14px 34px rgba(0,0,0,.45);
-    }
+    .btn-liquid:hover{ border-color: rgba(255,255,255,.18); box-shadow: 0 14px 34px rgba(0,0,0,.45); }
     .btn-liquid:hover::before{ opacity:.45; transform: translate3d(0,0,0); }
     .btn-liquid:active{ transform: scale(0.985); }
     .btn-liquid:active::before{ opacity:.70; }
-    .btn-liquid:active::after{
-      opacity:1;
-      animation: btnShine .55s ease-out;
-    }
-    @keyframes btnShine{
-      0%{ left:-60%; opacity:0; }
-      10%{ opacity:1; }
-      100%{ left:130%; opacity:0; }
-    }
+    .btn-liquid:active::after{ opacity:1; animation: btnShine .48s ease-out; }
+    @keyframes btnShine{ 0%{left:-60%;opacity:0;} 10%{opacity:1;} 100%{left:130%;opacity:0;} }
 
-    /* ===== остальное UI ===== */
+    /* ===== ВАЖНО: быстрый и плавный скролл ===== */
+    main{
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch; /* iOS быстрый */
+      overscroll-behavior: contain;
+      scroll-snap-type: none;
+    }
+    main::-webkit-scrollbar{display:none;}
+
+    /* Остальное UI */
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
     .wheel::-webkit-scrollbar{display:none;}
@@ -414,14 +381,13 @@
     .day-btn.range{background:rgba(10,132,255,.2);color:#fff;}
     .ios-select{background:rgba(44,44,46,.86);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:600;}
 
-    .tab-btn{flex:1;padding:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);border-bottom:2px solid transparent;transition:all .3s;}
+    .tab-btn{flex:1;padding:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);border-bottom:2px solid transparent;transition:all .22s;}
     .tab-btn.active{color:#fff;border-bottom-color:var(--kfc-red);}
 
     .progress-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:8px;}
     .progress-fill{height:100%;background:var(--kfc-red);border-radius:2px;}
     #sum-input{background:transparent;color:var(--kfc-red);font-weight:900;text-align:center;border:none;outline:none;width:100%;}
     .draft-badge{background:#E4002B;color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:900;text-transform:uppercase;}
-    main::-webkit-scrollbar{display:none;}
 
     /* Search */
     .search-hint{font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.35);margin:0 2px 10px;}
@@ -460,7 +426,7 @@
       color:#fff;
       opacity:0;
       pointer-events:none;
-      transition: opacity .22s ease, transform .22s ease;
+      transition: opacity .18s ease, transform .18s ease;
     }
     #toast.show{
       opacity:1;
@@ -473,21 +439,16 @@
       border: 1px solid rgba(10,132,255,.35);
       color:#e9f4ff;
     }
-    .btn-edit:hover{ border-color: rgba(10,132,255,.55); }
     .btn-delete{
       background: linear-gradient(180deg, rgba(228,0,43,.24), rgba(228,0,43,.10));
       border: 1px solid rgba(228,0,43,.35);
       color:#ffe8ee;
     }
-    .btn-delete:hover{ border-color: rgba(228,0,43,.55); }
-
-    /* Зелёный Excel */
     .btn-excel{
       background: linear-gradient(180deg, rgba(34,197,94,.22), rgba(34,197,94,.10));
       border: 1px solid rgba(34,197,94,.34);
       color:#eafff1;
     }
-    .btn-excel:hover{ border-color: rgba(34,197,94,.55); }
   </style>
 </head>
 
@@ -542,132 +503,21 @@
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
   const dataTU = {
-    "Alyona Rainskaya": [
-      "12741 — KFC Baizar Mall",
-      "12714 — KFC Essentai Mall",
-      "12750 — KFC Alem Plaza",
-      "12757 — KFC Neftek",
-      "12768 — KFC KazGu Almaty",
-      "12806 — KFC NASIKHA ATYRAU",
-      "12815 — KFC INFINITY MALL ATYRAU"
-    ],
-    "Andrey Nacharov": [
-      "12736 — KFC Batyr Mall",
-      "12737 — KFC Sarayarka",
-      "12751 — KFC UST Kamenogorsk",
-      "12772 — KFC Kutuzova Pavlodar",
-      "12783 — KFC MAXI MALL EKIBASTUZ",
-      "12784 — KFC MAXI MALL OSKEMEN",
-      "12787 — KFC Koschi",
-      "12825 — KFC CENTRAL PARK SEMEY"
-    ],
-    "Artyom Denissenko": [
-      "12708 — KFC Khan Shatour",
-      "12720 — KFC Respblika",
-      "12724 — KFC Mechta",
-      "12733 — KFC Asia Park",
-      "12796 — KFC Magnum Edil",
-      "12803 — KFC VSTRECHA",
-      "12821 — KFC ZHYBEK ZHOLY COMPASS",
-      "12827 — KFC KOKSHETAU AUEZOVA",
-      "12830 — KFC NURLY ZHOL ASTANA"
-    ],
-    "Igor Sokharev": [
-      "12710 — KFC Keruen",
-      "12726 — KFC Oasis",
-      "12782 — KFC NOMAD NEW",
-      "12786 — KFC Mart, Kostanay city",
-      "12809 — KFC DOSTYK MALL PETROPAVLOVSK",
-      "12826 — KFC KOSTANAY PLAZA"
-    ],
-    "Irina Zelenkevich": [
-      "12716 — KFC Merey",
-      "12740 — KFC Aktau",
-      "12754 — KFC AK KALA MALL",
-      "12763 — KFC Shum Mall - Aktau",
-      "12778 — KFC Atameken",
-      "12780 — KFC Mart Taraz",
-      "12791 — KFC Kyzylorda",
-      "12829 — KFC ZHAISAN"
-    ],
-    "Lolokhon Makhmudova": [
-      "12712 — KFC Googla",
-      "12722 — KFC Dostik Plaza",
-      "12743 — KFC Baluan Sholak",
-      "12746 — KFC Forum Mall",
-      "12779 — KFC Mart Almaty",
-      "12795 — KFC Globus",
-      "12811 — KFC APORT KULDZHA",
-      "12813 — KFC RP DOSTYK",
-      "12842 — KFC YASSY APARTMENTS TURKESTAN"
-    ],
-    "Nikol Tyurina": [
-      "12810 — KFC Temirtau",
-      "12710 — KFC Keruen city Astana",
-      "12715 — KFC City Mall Karaganda",
-      "12723 — KFC Bogembay",
-      "12728 — KFC Green",
-      "12731 — KFC Flag Karaganda",
-      "12755 — KFC LITE ASTRAHANKA",
-      "12814 — KFC SYGANAK",
-      "12818 — KFC FOODCITY ASTANA"
-    ],
-    "Nurlan Ataibekov": [
-      "12703 — KFC Mega Almaty",
-      "12704 — KFC Domillion",
-      "12713 — KFC Aport",
-      "12732 — KFC Adem",
-      "12761 — KFC Kulager",
-      "12770 — KFC Ainabulak",
-      "12790 — KFC Kaskelen",
-      "12808 — KFC COMPASS BISHKEK HIGHWAY",
-      "12816 — KFC APORT MIAMI"
-    ],
-    "Tolkinbek Zulpykhar": [
-      "12820 — KFC Dalida Mall Aktobe",
-      "12706 — KFC Manasa",
-      "12738 — KFC GOLDEN KEY",
-      "12745 — KFC Mega Expo",
-      "12747 — KFC Central Stadium - Akotobe",
-      "12753 — KFC Keruen City Mall - Aktobe",
-      "12828 — KFC INCITY ASTANA"
-    ],
-    "Ulan Toiganbayev": [
-      "12709 — KFC Maxima",
-      "12711 — KFC ADK",
-      "12725 — KFC Mega Park",
-      "12729 — KFC Tole Bi",
-      "12730 — KFC Moscow Mall",
-      "12756 — KFC SILKWAY CITY",
-      "12773 — KFC TSUM",
-      "12798 — KFC Compass",
-      "12804 — KFC GRES"
-    ],
-    "Valeriya Toishiyeva": [
-      "12839 — KFC Shymkent Tashkent RP",
-      "12748 — KFC Shymkent Plaza",
-      "12758 — KFC VAZ",
-      "12760 — KFC LEMON",
-      "12777 — KFC Sever - Shymkent City",
-      "12824 — KFC MEGA MALL SHYMKENT",
-      "12832 — KFC ALMATY AIRPORT",
-      "12839 — KFC SHYMKENT TASHKENT RP",
-      "12841 — KFC DALA MALL SHYMKENT"
-    ],
-    "Zhaidary Talapova": [
-      "12734 — KFC ATAKENT",
-      "12774 — KFC Asia Park Almaty",
-      "12775 — KFC MAGNUM - RELOCATION",
-      "12776 — KFC Malika",
-      "12799 — KFC Saryarka Almaty",
-      "12800 — KFC Masato",
-      "12801 — KFC Aksai",
-      "12807 — KFC SPUTNIK MALL",
-      "12819 — KFC GRAND PARK ALMATY"
-    ]
+    "Alyona Rainskaya": ["12741 — KFC Baizar Mall","12714 — KFC Essentai Mall","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"],
+    "Andrey Nacharov": ["12736 — KFC Batyr Mall","12737 — KFC Sarayarka","12751 — KFC UST Kamenogorsk","12772 — KFC Kutuzova Pavlodar","12783 — KFC MAXI MALL EKIBASTUZ","12784 — KFC MAXI MALL OSKEMEN","12787 — KFC Koschi","12825 — KFC CENTRAL PARK SEMEY"],
+    "Artyom Denissenko": ["12708 — KFC Khan Shatour","12720 — KFC Respblika","12724 — KFC Mechta","12733 — KFC Asia Park","12796 — KFC Magnum Edil","12803 — KFC VSTRECHA","12821 — KFC ZHYBEK ZHOLY COMPASS","12827 — KFC KOKSHETAU AUEZOVA","12830 — KFC NURLY ZHOL ASTANA"],
+    "Igor Sokharev": ["12710 — KFC Keruen","12726 — KFC Oasis","12782 — KFC NOMAD NEW","12786 — KFC Mart, Kostanay city","12809 — KFC DOSTYK MALL PETROPAVLOVSK","12826 — KFC KOSTANAY PLAZA"],
+    "Irina Zelenkevich": ["12716 — KFC Merey","12740 — KFC Aktau","12754 — KFC AK KALA MALL","12763 — KFC Shum Mall - Aktau","12778 — KFC Atameken","12780 — KFC Mart Taraz","12791 — KFC Kyzylorda","12829 — KFC ZHAISAN"],
+    "Lolokhon Makhmudova": ["12712 — KFC Googla","12722 — KFC Dostik Plaza","12743 — KFC Baluan Sholak","12746 — KFC Forum Mall","12779 — KFC Mart Almaty","12795 — KFC Globus","12811 — KFC APORT KULDZHA","12813 — KFC RP DOSTYK","12842 — KFC YASSY APARTMENTS TURKESTAN"],
+    "Nikol Tyurina": ["12810 — KFC Temirtau","12710 — KFC Keruen city Astana","12715 — KFC City Mall Karaganda","12723 — KFC Bogembay","12728 — KFC Green","12731 — KFC Flag Karaganda","12755 — KFC LITE ASTRAHANKA","12814 — KFC SYGANAK","12818 — KFC FOODCITY ASTANA"],
+    "Nurlan Ataibekov": ["12703 — KFC Mega Almaty","12704 — KFC Domillion","12713 — KFC Aport","12732 — KFC Adem","12761 — KFC Kulager","12770 — KFC Ainabulak","12790 — KFC Kaskelen","12808 — KFC COMPASS BISHKEK HIGHWAY","12816 — KFC APORT MIAMI"],
+    "Tolkinbek Zulpykhar": ["12820 — KFC Dalida Mall Aktobe","12706 — KFC Manasa","12738 — KFC GOLDEN KEY","12745 — KFC Mega Expo","12747 — KFC Central Stadium - Akotobe","12753 — KFC Keruen City Mall - Aktobe","12828 — KFC INCITY ASTANA"],
+    "Ulan Toiganbayev": ["12709 — KFC Maxima","12711 — KFC ADK","12725 — KFC Mega Park","12729 — KFC Tole Bi","12730 — KFC Moscow Mall","12756 — KFC SILKWAY CITY","12773 — KFC TSUM","12798 — KFC Compass","12804 — KFC GRES"],
+    "Valeriya Toishiyeva": ["12839 — KFC Shymkent Tashkent RP","12748 — KFC Shymkent Plaza","12758 — KFC VAZ","12760 — KFC LEMON","12777 — KFC Sever - Shymkent City","12824 — KFC MEGA MALL SHYMKENT","12832 — KFC ALMATY AIRPORT","12839 — KFC SHYMKENT TASHKENT RP","12841 — KFC DALA MALL SHYMKENT"],
+    "Zhaidary Talapova": ["12734 — KFC ATAKENT","12774 — KFC Asia Park Almaty","12775 — KFC MAGNUM - RELOCATION","12776 — KFC Malika","12799 — KFC Saryarka Almaty","12800 — KFC Masato","12801 — KFC Aksai","12807 — KFC SPUTNIK MALL","12819 — KFC GRAND PARK ALMATY"]
   };
 
-  const STORAGE_KEY = 'kfc_loss_pro_v10';
+  const STORAGE_KEY = 'kfc_loss_pro_v11';
 
   let db = { reports: [], drafts: [] };
   try {
@@ -675,10 +525,7 @@
     db.drafts = Array.isArray(saved.drafts) ? saved.drafts : [];
   } catch (_) { db.drafts = []; }
 
-  function saveDraftsToLS() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts }));
-  }
-
+  function saveDraftsToLS() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: db.drafts })); }
   function pad2(n){ return String(n).padStart(2,'0'); }
 
   function getNowObj() {
@@ -718,26 +565,50 @@
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toast._t);
-    toast._t = setTimeout(()=>el.classList.remove('show'), 1700);
+    toast._t = setTimeout(()=>el.classList.remove('show'), 1400);
   }
+
+  /* ===== HAPTIC (WOW) ===== */
+  const HAPTIC = tg?.HapticFeedback;
+  let _hLast = 0;
+  function hapticImpact(style="light"){
+    try{
+      const now = Date.now();
+      if (now - _hLast < 70) return; // защита от спама
+      _hLast = now;
+      HAPTIC?.impactOccurred?.(style);
+    } catch(_) {}
+  }
+  function hapticSelect(){
+    try{
+      const now = Date.now();
+      if (now - _hLast < 70) return;
+      _hLast = now;
+      HAPTIC?.selectionChanged?.();
+    } catch(_) {}
+  }
+  // общий “клик” по любым кнопкам (деликатно)
+  document.addEventListener('click', (e)=>{
+    const btn = e.target?.closest?.('button');
+    if(!btn) return;
+    // исключаем быстрые повторные клики
+    hapticImpact(btn.classList.contains('btn-delete') ? "medium" : "light");
+  }, { passive:true });
 
   async function apiJson(url, options = {}, timeoutMs = 9000) {
     const controller = new AbortController();
     const t = setTimeout(()=>controller.abort(), timeoutMs);
-
     const opt = { ...options, signal: controller.signal };
     try {
       const resp = await fetch(url, opt);
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
       return data;
-    } finally {
-      clearTimeout(t);
-    }
+    } finally { clearTimeout(t); }
   }
 
   async function loadReportsFromServer() {
-    const data = await apiJson(`${API}/reports`, { method: "GET" });
+    const data = await apiJson(`${API}/reports`, { method: "GET" }, 12000);
     db.reports = (data.reports || []).map(normalizeServerReport);
   }
 
@@ -745,9 +616,7 @@
     if (!tg) return;
     try {
       if (tg.isPopupOpened) return;
-      if (typeof tg.showPopup === "function") {
-        tg.showPopup({ title, message, buttons: [{ type: "ok" }] });
-      }
+      if (typeof tg.showPopup === "function") tg.showPopup({ title, message, buttons: [{ type: "ok" }] });
     } catch (_) {}
   }
 
@@ -757,6 +626,7 @@
       await loadReportsFromServer();
       render();
       safePopup("Готово", "Данные обновлены с сервера.");
+      hapticImpact("light");
     } catch (e) {
       toast("Ошибка обновления");
       alert("Не удалось обновить данные: " + (e?.message || e));
@@ -790,10 +660,10 @@
     primaryBtn.disabled = false;
     primaryBtn.classList.remove('opacity-40');
     primaryBtn.innerText = label;
-    primaryBtn.onclick = handler;
+    primaryBtn.onclick = () => { hapticImpact("light"); handler(); };
   }
 
-  /* ===== ФИКС ПОИСКА: сохранение фокуса/курсора при render() ===== */
+  /* ===== ФИКС ПОИСКА: фокус/курсор сохраняются ===== */
   let renderScheduled = false;
   function scheduleRenderPreserveFocus(activeId, selStart, selEnd) {
     if (renderScheduled) return;
@@ -821,6 +691,17 @@
     const selEnd   = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : null;
     state[field] = value;
     scheduleRenderPreserveFocus(inputId, selStart, selEnd);
+  }
+
+  /* ===== УСКОРЕНИЕ: lucide обновляем не на каждом шаге синхронно ===== */
+  let _iconsScheduled = false;
+  function scheduleIcons(){
+    if(_iconsScheduled) return;
+    _iconsScheduled = true;
+    requestAnimationFrame(() => {
+      _iconsScheduled = false;
+      try { lucide.createIcons(); } catch(_) {}
+    });
   }
 
   function render() {
@@ -990,6 +871,7 @@
 
       setPrimary(isStart ? "Установить конец" : "Далее", () => {
         const v = getWheels();
+        hapticSelect();
         if (isStart) {
           state.start.hour=v.h; state.start.min=v.m;
           state.start.ts = new Date(state.start.year, state.start.month, state.start.day, state.start.hour, state.start.min).getTime();
@@ -1023,7 +905,7 @@
         </div>
       `;
       setPrimary(state.editId ? "Сохранить" : "Завершить", saveReport, true, true);
-      setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 80);
+      setTimeout(() => { const inp=document.getElementById('sum-input'); if(inp){ inp.focus(); scaleSumInput(inp);} }, 60);
     }
 
     else if (state.view === 'analytics_period') {
@@ -1137,9 +1019,7 @@
       }
     }
 
-    try { lucide.createIcons(); } catch(_) {}
-
-    // Подвешиваем “линзу” на текущие карточки (после каждого render)
+    scheduleIcons();
     attachLensHandlers();
   }
 
@@ -1200,6 +1080,7 @@
 
     saveDraftsToLS();
     state.view='main'; historyStack=['main']; render();
+    hapticImpact("light");
   }
 
   function resumeDraft(id) {
@@ -1211,6 +1092,7 @@
       if (!state.end) state.end = JSON.parse(JSON.stringify(state.start));
       historyStack=['main','calendar'];
       render();
+      hapticImpact("light");
     }
   }
 
@@ -1218,10 +1100,12 @@
     db.drafts = db.drafts.filter(d => d.draftId !== id);
     saveDraftsToLS();
     render();
+    hapticImpact("medium");
   }
 
   function exportExcelServer() {
     const url = `${window.location.origin}${API}/export.xlsx`;
+    hapticImpact("light");
     if (tg && typeof tg.openLink === "function") { tg.openLink(url); return; }
     window.location.href = url;
   }
@@ -1245,22 +1129,28 @@
       comment: state.comment || '-'
     };
 
+    toast("Сохраняю...");
     try {
       const isEdit = !!state.editId;
       await apiJson(isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      }, 12000);
+      }, 15000);
 
-      loadReportsFromServer().then(()=>render()).catch(()=>{});
+      await loadReportsFromServer();
+
       if (state.draftId) {
         db.drafts = db.drafts.filter(d => d.draftId !== state.draftId);
         saveDraftsToLS();
       }
 
-      state.view='main'; historyStack=['main']; state.editId=null; render();
+      state.view='main'; historyStack=['main']; state.editId=null;
+      render();
+      toast("Готово");
+      hapticImpact("medium");
     } catch (e) {
+      toast("Ошибка");
       alert(`Ошибка: ${e?.message || 'unknown'}`);
     }
   }
@@ -1290,15 +1180,20 @@
 
     historyStack = ['main','history','comment'];
     render();
+    hapticImpact("light");
   }
 
   async function deleteReport(id) {
     if (!confirm("Удалить этот инцидент?")) return;
+    toast("Удаляю...");
     try {
-      await apiJson(`${API}/reports/${id}`, { method: "DELETE" }, 12000);
-      loadReportsFromServer().then(()=>render()).catch(()=>{});
+      await apiJson(`${API}/reports/${id}`, { method: "DELETE" }, 15000);
+      await loadReportsFromServer();
       render();
+      toast("Удалено");
+      hapticImpact("medium");
     } catch (e) {
+      toast("Ошибка");
       alert("Ошибка: " + (e?.message || e));
     }
   }
@@ -1322,10 +1217,24 @@
     navigate('managers');
   }
 
-  function navigate(v){ historyStack.push(v); state.view=v; render(); }
-  function goBack(){ if(historyStack.length>1){ historyStack.pop(); state.view=historyStack[historyStack.length-1]; render(); } }
-  function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); }
-  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); }
+  function navigate(v){
+    historyStack.push(v);
+    state.view=v;
+    render();
+    hapticSelect();
+  }
+
+  function goBack(){
+    if(historyStack.length>1){
+      historyStack.pop();
+      state.view=historyStack[historyStack.length-1];
+      render();
+      hapticSelect();
+    }
+  }
+
+  function setDay(d){ if(state.stage==='start') state.start.day=d; else state.end.day=d; render(); hapticSelect(); }
+  function updateFlowDate(p,v){ const cur=state.stage==='start'?state.start:state.end; cur[p]=parseInt(v); render(); hapticSelect(); }
 
   function setAnalyticsDate(ts){
     if(!state.analyticsCal.start || (state.analyticsCal.start && state.analyticsCal.end)){
@@ -1335,6 +1244,7 @@
       else state.analyticsCal.end=ts;
     }
     render();
+    hapticSelect();
   }
 
   function changeCalMonth(s){
@@ -1342,6 +1252,7 @@
     if(state.analyticsCal.month>11){state.analyticsCal.month=0;state.analyticsCal.year++;}
     if(state.analyticsCal.month<0){state.analyticsCal.month=11;state.analyticsCal.year--;}
     render();
+    hapticSelect();
   }
 
   function scaleSumInput(input){
@@ -1392,7 +1303,7 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (WOW) ===== */
   const rootStyle = document.documentElement.style;
   let pointerX = 0, pointerY = 0;
   let smoothX = 0, smoothY = 0;
@@ -1406,7 +1317,6 @@
   function setParallaxFromPointer(clientX, clientY){
     const w = window.innerWidth || 1;
     const h = window.innerHeight || 1;
-
     const nx = (clientX / w - 0.5);
     const ny = (clientY / h - 0.5);
     pointerX = nx * 22;
@@ -1421,28 +1331,6 @@
     if(!main) return 0;
     const s = main.scrollTop || 0;
     return -(s * 0.02);
-  }
-
-  function rafParallax(){
-    const targetS = setParallaxFromScroll();
-
-    smoothX += (pointerX - smoothX) * 0.10;
-    smoothY += (pointerY - smoothY) * 0.10;
-    smoothS += (targetS - smoothS) * 0.10;
-
-    rootStyle.setProperty('--px', smoothX.toFixed(2) + 'px');
-    rootStyle.setProperty('--py', smoothY.toFixed(2) + 'px');
-    rootStyle.setProperty('--ps', smoothS.toFixed(2) + 'px');
-
-    smoothSpotX += (spotX - smoothSpotX) * 0.12;
-    smoothSpotY += (spotY - smoothSpotY) * 0.12;
-    smoothSpotOpacity += (targetSpotOpacity - smoothSpotOpacity) * 0.12;
-
-    rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2) + '%');
-    rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2) + '%');
-    rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
-
-    requestAnimationFrame(rafParallax);
   }
 
   function spotlightOn(){ targetSpotOpacity = 1.0; }
@@ -1467,7 +1355,59 @@
   window.addEventListener('touchend', () => spotlightOff(), { passive:true });
   window.addEventListener('touchcancel', () => spotlightOff(), { passive:true });
 
-  /* ===== ЛИНЗА: реакция карточек на палец/мышь ===== */
+  /* Тактильность при скролле (деликатно): короткий “selection” каждые ~500ms, когда реально скроллим */
+  let _scrollTick = 0;
+  function bindScrollHaptics(){
+    const main = document.getElementById('view-container');
+    if(!main || main.__hBound) return;
+    main.__hBound = true;
+    main.addEventListener('scroll', () => {
+      const now = Date.now();
+      if(now - _scrollTick > 520){
+        _scrollTick = now;
+        hapticSelect();
+      }
+    }, { passive:true });
+  }
+
+  /* Автоволна фона: даже если ничего не трогать */
+  let _t0 = performance.now();
+  function rafParallax(){
+    const t = (performance.now() - _t0) / 1000;
+
+    // Автоволна: синусы дают живое движение
+    const ax = (Math.sin(t * 0.85) * 18 + Math.sin(t * 0.33) * 10);
+    const ay = (Math.cos(t * 0.72) * 16 + Math.cos(t * 0.27) * 9);
+
+    // Яркость/перелив волной
+    const shine = (Math.sin(t * 1.05) * 0.05 + Math.sin(t * 0.41) * 0.04);
+
+    rootStyle.setProperty('--ax', ax.toFixed(2) + 'px');
+    rootStyle.setProperty('--ay', ay.toFixed(2) + 'px');
+    rootStyle.setProperty('--shine', Math.max(0.08, Math.min(0.18, 0.12 + shine)).toFixed(3));
+
+    const targetS = setParallaxFromScroll();
+
+    smoothX += (pointerX - smoothX) * 0.10;
+    smoothY += (pointerY - smoothY) * 0.10;
+    smoothS += (targetS - smoothS) * 0.12;
+
+    rootStyle.setProperty('--px', smoothX.toFixed(2) + 'px');
+    rootStyle.setProperty('--py', smoothY.toFixed(2) + 'px');
+    rootStyle.setProperty('--ps', smoothS.toFixed(2) + 'px');
+
+    smoothSpotX += (spotX - smoothSpotX) * 0.12;
+    smoothSpotY += (spotY - smoothSpotY) * 0.12;
+    smoothSpotOpacity += (targetSpotOpacity - smoothSpotOpacity) * 0.12;
+
+    rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2) + '%');
+    rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2) + '%');
+    rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
+
+    requestAnimationFrame(rafParallax);
+  }
+
+  /* ===== ЛИНЗА: реакция карточек ===== */
   function attachLensHandlers(){
     const cards = document.querySelectorAll('.lens-card');
     cards.forEach(card => {
@@ -1483,7 +1423,6 @@
       };
 
       card.addEventListener('mousemove', (e) => setXY(e.clientX, e.clientY), { passive:true });
-      card.addEventListener('mouseenter', () => card.style.setProperty('--lpress', '0'), { passive:true });
       card.addEventListener('mouseleave', () => card.style.setProperty('--lpress', '0'), { passive:true });
 
       card.addEventListener('touchstart', (e) => {
@@ -1509,11 +1448,12 @@
   window.addEventListener('load', () => {
     try {
       render();
+      bindScrollHaptics();
       requestAnimationFrame(rafParallax);
 
       toast("Загрузка...");
       loadReportsFromServer()
-        .then(() => { render(); toast("Готово"); })
+        .then(() => { render(); bindScrollHaptics(); toast("Готово"); })
         .catch(() => { toast("Без данных (временно)"); });
     } catch (e) {
       alert("Ошибка интерфейса: " + (e?.message || e));
