@@ -37,11 +37,6 @@
       --lx: 50%;
       --ly: 40%;
       --lpress: 0;
-
-      /* Header highlight (движение пальца по шапке) */
-      --hhx: 50%;
-      --hhy: 50%;
-      --hhop: 0;
     }
 
     html,body{height:100%;}
@@ -55,15 +50,15 @@
       user-select:none;
     }
 
-    /* ===== ДИНАМИЧНЫЙ ФОН (слегка светлее) ===== */
+    /* ===== ДИНАМИЧНЫЙ ФОН ===== */
     #bg{
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
       background:
-        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.26), transparent 60%),
-        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.25), transparent 60%),
-        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.20), transparent 60%),
-        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.25), transparent 60%),
-        linear-gradient(180deg, rgba(0,0,0,.38), rgba(0,0,0,.72));
+        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.22), transparent 60%),
+        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.22), transparent 60%),
+        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.18), transparent 60%),
+        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.22), transparent 60%),
+        linear-gradient(180deg, rgba(0,0,0,.42), rgba(0,0,0,.78));
     }
 
     #bg::before, #bg::after{
@@ -75,7 +70,7 @@
         radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.38), transparent 55%),
         radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.32), transparent 58%),
         radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.38), transparent 58%);
-      filter: blur(20px) saturate(135%);
+      filter: blur(20px) saturate(130%);
       opacity: .98;
       will-change: transform, filter, opacity;
       transform: translate3d(0,0,0);
@@ -94,8 +89,8 @@
     }
 
     #bg::after{
-      opacity:.80;
-      filter: blur(32px) saturate(145%);
+      opacity:.78;
+      filter: blur(32px) saturate(140%);
       mix-blend-mode: screen;
       animation: auroraFlowB 10.5s ease-in-out infinite;
       transform:
@@ -126,71 +121,28 @@
         );
     }
 
-    /* ===== ПОЛОСКИ: СВЕТЛЕЕ В 2 РАЗА + ЧУТЬ ЗАМЕТНЕЕ ВОЛНА ===== */
     #bg-lines{
       position:fixed; inset:0; z-index:1; pointer-events:none;
-
-      /* было ~.24, делаем заметнее */
-      opacity:.42;
-
+      opacity:.22;
       background:
         repeating-linear-gradient(
           135deg,
-          rgba(255,255,255,.40) 0px,
-          rgba(255,255,255,.40) 1px,
+          rgba(255,255,255,.20) 0px,
+          rgba(255,255,255,.20) 1px,
           transparent 1px,
-          transparent 34px
+          transparent 26px
         );
-
-      -webkit-mask-image:
-        radial-gradient(860px 860px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='22'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
-      -webkit-mask-size: auto, 520px 520px;
-      -webkit-mask-repeat: no-repeat, repeat;
-      -webkit-mask-position: center, 0 0;
-
-      mask-image:
-        radial-gradient(860px 860px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='22'/%3E%3C/filter%3E%3Crect width='520' height='520' fill='white' filter='url(%23d)' opacity='1'/%3E%3C/svg%3E");
-      mask-size: auto, 520px 520px;
-      mask-repeat: no-repeat, repeat;
-      mask-position: center, 0 0;
-
-      will-change: transform, opacity, filter, background-position, -webkit-mask-position, mask-position;
-      mix-blend-mode: overlay;
-
-      animation: linesWaveSlow 6.8s ease-in-out infinite;
-
+      mask-image: radial-gradient(750px 750px at 50% 42%, rgba(0,0,0,1), rgba(0,0,0,0));
+      will-change: transform, opacity, filter, background-position;
+      background-size: 200% 200%;
+      animation: linesWave 3.8s ease-in-out infinite;
       transform:
         translate3d(
-          calc(var(--px) * 0.22 + var(--ax) * 0.60),
-          calc(var(--py) * 0.22 + var(--ay) * 0.60),
+          calc(var(--px) * 0.30 + var(--ax) * 0.70),
+          calc(var(--py) * 0.30 + var(--ay) * 0.70),
           0
         );
-    }
-
-    @keyframes linesWaveSlow{
-      0%{
-        opacity:.36;
-        filter: blur(0px) brightness(1.06);
-        background-position: 0% 54%;
-        -webkit-mask-position: center, 0px 0px;
-        mask-position: center, 0px 0px;
-      }
-      50%{
-        opacity:.52;
-        filter: blur(.45px) brightness(1.22);
-        background-position: 100% 46%;
-        -webkit-mask-position: center, 70px -48px;
-        mask-position: center, 70px -48px;
-      }
-      100%{
-        opacity:.40;
-        filter: blur(0px) brightness(1.10);
-        background-position: 0% 54%;
-        -webkit-mask-position: center, 0px 0px;
-        mask-position: center, 0px 0px;
-      }
+      mix-blend-mode: overlay;
     }
 
     #bg-noise{
@@ -204,26 +156,44 @@
     }
 
     @keyframes auroraFlowA{
-      0%   { filter: blur(19px) saturate(132%); opacity:.92; }
-      50%  { filter: blur(22px) saturate(160%); opacity:1; }
-      100% { filter: blur(19px) saturate(145%); opacity:.95; }
+      0%   { filter: blur(19px) saturate(130%); opacity:.92; }
+      50%  { filter: blur(22px) saturate(155%); opacity:1; }
+      100% { filter: blur(19px) saturate(140%); opacity:.95; }
     }
     @keyframes auroraFlowB{
-      0%   { filter: blur(32px) saturate(145%); opacity:.70; }
-      50%  { filter: blur(38px) saturate(170%); opacity:.92; }
-      100% { filter: blur(32px) saturate(155%); opacity:.74; }
+      0%   { filter: blur(32px) saturate(140%); opacity:.70; }
+      50%  { filter: blur(38px) saturate(165%); opacity:.92; }
+      100% { filter: blur(32px) saturate(150%); opacity:.74; }
     }
     @keyframes pulseWave{
       0%   { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 - 10px), calc(var(--py) * 0.50 + var(--ay) * 1.10 + 8px), 0) scale(1.02); }
       50%  { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 + 18px), calc(var(--py) * 0.50 + var(--ay) * 1.10 - 12px), 0) scale(1.06); }
       100% { transform: translate3d(calc(var(--px) * 0.50 + var(--ax) * 1.10 - 8px), calc(var(--py) * 0.50 + var(--ay) * 1.10 + 12px), 0) scale(1.03); }
     }
+
+    @keyframes linesWave{
+      0%{
+        opacity:.18;
+        filter: blur(0px) brightness(1.00);
+        background-position: 0% 50%;
+      }
+      50%{
+        opacity:.28;
+        filter: blur(.2px) brightness(1.18);
+        background-position: 100% 50%;
+      }
+      100%{
+        opacity:.20;
+        filter: blur(0px) brightness(1.04);
+        background-position: 0% 50%;
+      }
+    }
     @keyframes noiseMove{
       0%{ transform: translate3d(calc(var(--ax) * 0.30), calc(var(--ay) * 0.30), 0); }
       100%{ transform: translate3d(calc(var(--ax) * 0.30 - 40px), calc(var(--ay) * 0.30 + 20px), 0); }
     }
 
-    /* ===== SPOTLIGHT под пальцем ===== */
+    /* ===== SPOTLIGHT ===== */
     #spotlight{
       position:fixed; inset:0; z-index:3; pointer-events:none;
       opacity: var(--sop);
@@ -237,7 +207,7 @@
       mix-blend-mode: screen;
     }
 
-    /* ===== “жидкое стекло” базовый текст ===== */
+    /* ===== “жидкое стекло” текст ===== */
     .glass-ui h1,.glass-ui h2,.glass-ui h3,.glass-ui p,.glass-ui span,.glass-ui button,.glass-ui label,.glass-ui small{
       color: rgba(255,255,255,.92);
       text-shadow:
@@ -248,66 +218,16 @@
     }
     .glass-ui input,.glass-ui textarea{ -webkit-text-stroke: 0; text-shadow:none; }
 
-    /* ===== KFC: iOS liquid glass (усилили “стекло” именно в шапке) ===== */
     .glass-shimmer{
-      background: linear-gradient(95deg,
-        rgba(255,255,255,.78),
-        rgba(198,230,255,.96),
-        rgba(255,255,255,.72),
-        rgba(255,255,255,.90)
-      );
+      background: linear-gradient(90deg, rgba(255,255,255,.70), rgba(180,220,255,.90), rgba(255,255,255,.60), rgba(255,255,255,.78));
       -webkit-background-clip:text; background-clip:text;
       color:transparent;
-      background-size: 260% 100%;
+      background-size: 240% 100%;
       animation: shimmer 6.2s ease-in-out infinite;
-      text-shadow:
-        0 0 12px rgba(255,255,255,.10),
-        0 0 24px rgba(140,195,255,.16),
-        0 1px 0 rgba(0,0,0,.38);
-      -webkit-text-stroke: 0.28px rgba(255,255,255,.12);
-      position:relative;
+      text-shadow: 0 0 10px rgba(255,255,255,.06), 0 0 20px rgba(120,170,255,.10), 0 1px 0 rgba(0,0,0,.35);
+      -webkit-text-stroke: 0.25px rgba(255,255,255,.08);
     }
-    .glass-shimmer::after{
-      content:"";
-      position:absolute; inset:-10% -14%;
-      background:
-        radial-gradient(120px 36px at 30% 35%, rgba(255,255,255,.22), transparent 70%),
-        radial-gradient(110px 30px at 70% 62%, rgba(120,170,255,.16), transparent 72%);
-      filter: blur(10px);
-      opacity:.40;
-      pointer-events:none;
-      mix-blend-mode: screen;
-    }
-    @keyframes shimmer{
-      0%{ background-position: 0% 50%; }
-      50%{ background-position: 100% 50%; }
-      100%{ background-position: 0% 50%; }
-    }
-
-    /* ===== LOSS CONTROL: более “стеклянный”, не плоский ===== */
-    .loss-glass{
-      background: linear-gradient(90deg,
-        rgba(255,255,255,.62),
-        rgba(255,180,195,.72),
-        rgba(255,80,110,.88),
-        rgba(255,255,255,.62)
-      );
-      -webkit-background-clip:text; background-clip:text;
-      color:transparent;
-      background-size: 220% 100%;
-      animation: lossShine 8s ease-in-out infinite;
-      text-shadow:
-        0 0 10px rgba(255,120,140,.16),
-        0 0 22px rgba(255,80,110,.14),
-        0 1px 0 rgba(0,0,0,.40);
-      -webkit-text-stroke: 0.26px rgba(255,255,255,.10);
-      opacity:.98;
-    }
-    @keyframes lossShine{
-      0%{ background-position: 0% 50%; }
-      50%{ background-position: 100% 50%; }
-      100%{ background-position: 0% 50%; }
-    }
+    @keyframes shimmer{ 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
 
     /* ===== Карточки + glow + border ===== */
     .ios-card{
@@ -436,40 +356,15 @@
     .btn-liquid:active::after{ opacity:1; animation: btnShine .48s ease-out; }
     @keyframes btnShine{ 0%{left:-60%;opacity:0;} 10%{opacity:1;} 100%{left:130%;opacity:0;} }
 
-    /* ===== ЛЁГКИЙ GLASS HIGHLIGHT НА КНОПКАХ ШАПКИ ПРИ ДВИЖЕНИИ ПАЛЬЦА ===== */
-    .header-btn{
-      position:relative;
-      isolation:isolate;
-    }
-    .header-btn::before{
-      content:"";
-      position:absolute; inset:-2px;
-      border-radius:999px;
-      background:
-        radial-gradient(120px 90px at var(--hhx) var(--hhy),
-          rgba(255,255,255,.18),
-          rgba(140,190,255,.10) 28%,
-          transparent 62%);
-      opacity: var(--hhop);
-      transition: opacity .18s ease;
-      pointer-events:none;
-      mix-blend-mode: screen;
-      filter: blur(0.2px);
-      z-index:0;
-    }
-    .header-btn > *{ position:relative; z-index:1; }
-
-    /* ===== ВАЖНО: мягкий “ощущаемый” скролл ===== */
+    /* ===== Плавный быстрый скролл ===== */
     main{
       scroll-behavior: smooth;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scroll-snap-type: none;
-      scroll-padding-top: 88px;
     }
     main::-webkit-scrollbar{display:none;}
 
-    /* Остальное UI */
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
     .wheel::-webkit-scrollbar{display:none;}
@@ -549,6 +444,22 @@
       border: 1px solid rgba(34,197,94,.34);
       color:#eafff1;
     }
+
+    /* ===== iOS SCROLL STABILITY FIX (ВАЖНО) =====
+       во время скролла отключаем hover/lens/active чтобы не было дерганий */
+    body.is-scrolling .card-anim,
+    body.is-scrolling .lens-card,
+    body.is-scrolling button{
+      pointer-events:none !important;
+    }
+    body.is-scrolling .card-anim:hover,
+    body.is-scrolling .card-anim:active{
+      transform:none !important;
+      box-shadow:none !important;
+    }
+    body.is-scrolling .lens-layer{
+      opacity:0 !important;
+    }
   </style>
 </head>
 
@@ -562,22 +473,19 @@
   <div id="toast"></div>
 
   <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
-    <header id="app-header" class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/28 backdrop-blur-md z-50">
+    <header class="pt-12 pb-4 px-6 flex items-center justify-between border-b border-white/5 sticky top-0 bg-black/30 backdrop-blur-md z-50">
       <div class="flex items-center gap-4">
-        <button id="back-btn" onclick="goBack()"
-          class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid header-btn">
+        <button id="back-btn" onclick="goBack()" class="hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid">
           <i data-lucide="chevron-left" class="text-blue-400"></i>
         </button>
 
         <div class="flex flex-col">
           <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">KFC</h1>
-          <p class="text-[9px] font-bold uppercase loss-glass" style="letter-spacing:0.22em;">LOSS CONTROL</p>
+          <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:#ff2a4a;">LOSS CONTROL</p>
         </div>
       </div>
 
-      <button onclick="refreshFromServer()"
-        class="text-gray-200/70 transition-transform btn-liquid w-10 h-10 rounded-full flex items-center justify-center header-btn"
-        title="Обновить">
+      <button onclick="refreshFromServer()" class="text-gray-200/70 transition-transform btn-liquid w-10 h-10 rounded-full flex items-center justify-center" title="Обновить">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
       </button>
     </header>
@@ -764,7 +672,7 @@
     primaryBtn.onclick = () => { hapticImpact("light"); handler(); };
   }
 
-  /* ===== ФИКС ПОИСКА: фокус/курсор сохраняются ===== */
+  /* ===== ФИКС ПОИСКА: фокус не слетает ===== */
   let renderScheduled = false;
   function scheduleRenderPreserveFocus(activeId, selStart, selEnd) {
     if (renderScheduled) return;
@@ -794,7 +702,7 @@
     scheduleRenderPreserveFocus(inputId, selStart, selEnd);
   }
 
-  /* ===== lucide обновляем в rAF ===== */
+  /* ===== УСКОРЕНИЕ: lucide ===== */
   let _iconsScheduled = false;
   function scheduleIcons(){
     if(_iconsScheduled) return;
@@ -1036,9 +944,9 @@
         <div class="ios-card border-live lens-card p-5">
           <div class="lens-layer"></div>
           <div class="flex justify-between items-center mb-6">
-            <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid header-btn"><i data-lucide="chevron-left"></i></button>
+            <button onclick="changeCalMonth(-1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid"><i data-lucide="chevron-left"></i></button>
             <span class="font-bold text-sm uppercase tracking-widest">${monthNames[cal.month]} ${cal.year}</span>
-            <button onclick="changeCalMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid header-btn"><i data-lucide="chevron-right"></i></button>
+            <button onclick="changeCalMonth(1)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 btn-liquid"><i data-lucide="chevron-right"></i></button>
           </div>
 
           <div class="cal-grid">
@@ -1070,7 +978,7 @@
           <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
           <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
 
-          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[10px] uppercase btn-liquid btn-excel header-btn">
+          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[10px] uppercase btn-liquid btn-excel">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Скачать Excel
           </button>
         </div>
@@ -1107,10 +1015,10 @@
               </p>
 
               <div class="flex gap-3 mt-4">
-                <button onclick="editReport(${r.id})" class="flex-1 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest btn-liquid btn-edit header-btn">
+                <button onclick="editReport(${r.id})" class="flex-1 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest btn-liquid btn-edit">
                   Редактировать
                 </button>
-                <button onclick="deleteReport(${r.id})" class="px-5 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest btn-liquid btn-delete header-btn">
+                <button onclick="deleteReport(${r.id})" class="px-5 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest btn-liquid btn-delete">
                   Удалить
                 </button>
               </div>
@@ -1404,9 +1312,8 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА + HEADER HIGHLIGHT ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА ===== */
   const rootStyle = document.documentElement.style;
-
   let pointerX = 0, pointerY = 0;
   let smoothX = 0, smoothY = 0;
   let smoothS = 0;
@@ -1415,11 +1322,6 @@
   let smoothSpotX = 0.5, smoothSpotY = 0.4;
   let targetSpotOpacity = 0.0;
   let smoothSpotOpacity = 0.0;
-
-  let headerX = 0.5, headerY = 0.5;
-  let smoothHeaderX = 0.5, smoothHeaderY = 0.5;
-  let headerTargetOpacity = 0.0;
-  let headerSmoothOpacity = 0.0;
 
   function setParallaxFromPointer(clientX, clientY){
     const w = window.innerWidth || 1;
@@ -1431,17 +1333,6 @@
 
     spotX = Math.min(1, Math.max(0, clientX / w));
     spotY = Math.min(1, Math.max(0, clientY / h));
-
-    // header local coords
-    const header = document.getElementById('app-header');
-    if (header) {
-      const r = header.getBoundingClientRect();
-      const hx = (clientX - r.left) / Math.max(1, r.width);
-      const hy = (clientY - r.top) / Math.max(1, r.height);
-      headerX = Math.min(1, Math.max(0, hx));
-      headerY = Math.min(1, Math.max(0, hy));
-      headerTargetOpacity = 0.55; // видно, но не “фонарик”
-    }
   }
 
   function setParallaxFromScroll(){
@@ -1455,45 +1346,43 @@
   function spotlightSoft(){ targetSpotOpacity = 0.55; }
   function spotlightOff(){ targetSpotOpacity = 0.0; }
 
-  function headerGlowOn(){ headerTargetOpacity = 0.60; }
-  function headerGlowSoft(){ headerTargetOpacity = 0.42; }
-  function headerGlowOff(){ headerTargetOpacity = 0.0; }
-
-  window.addEventListener('mousemove', (e) => { setParallaxFromPointer(e.clientX, e.clientY); spotlightSoft(); headerGlowSoft(); }, { passive:true });
-  window.addEventListener('mouseleave', () => { spotlightOff(); headerGlowOff(); }, { passive:true });
+  window.addEventListener('mousemove', (e) => { setParallaxFromPointer(e.clientX, e.clientY); spotlightSoft(); }, { passive:true });
+  window.addEventListener('mouseleave', () => spotlightOff(), { passive:true });
 
   window.addEventListener('touchstart', (e) => {
     const t = e.touches && e.touches[0];
     if(t) setParallaxFromPointer(t.clientX, t.clientY);
     spotlightOn();
-    headerGlowOn();
   }, { passive:true });
 
   window.addEventListener('touchmove', (e) => {
     const t = e.touches && e.touches[0];
     if(t) setParallaxFromPointer(t.clientX, t.clientY);
     spotlightOn();
-    headerGlowOn();
   }, { passive:true });
 
-  window.addEventListener('touchend', () => { spotlightOff(); headerGlowOff(); }, { passive:true });
-  window.addEventListener('touchcancel', () => { spotlightOff(); headerGlowOff(); }, { passive:true });
+  window.addEventListener('touchend', () => spotlightOff(), { passive:true });
+  window.addEventListener('touchcancel', () => spotlightOff(), { passive:true });
 
-  /* Тактильность при скролле */
-  let _scrollTick = 0;
+  /* ===== iOS SCROLL STABILITY FIX (JS) ===== */
   function bindScrollHaptics(){
     const main = document.getElementById('view-container');
     if(!main || main.__hBound) return;
     main.__hBound = true;
+
+    let scrollTimer = null;
+
     main.addEventListener('scroll', () => {
-      const now = Date.now();
-      if(now - _scrollTick > 520){
-        _scrollTick = now;
-        hapticSelect();
-      }
+      document.body.classList.add('is-scrolling');
+
+      if(scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        document.body.classList.remove('is-scrolling');
+      }, 120);
     }, { passive:true });
   }
 
+  /* Автоволна фона */
   let _t0 = performance.now();
   function rafParallax(){
     const t = (performance.now() - _t0) / 1000;
@@ -1504,7 +1393,7 @@
 
     rootStyle.setProperty('--ax', ax.toFixed(2) + 'px');
     rootStyle.setProperty('--ay', ay.toFixed(2) + 'px');
-    rootStyle.setProperty('--shine', Math.max(0.08, Math.min(0.20, 0.13 + shine)).toFixed(3));
+    rootStyle.setProperty('--shine', Math.max(0.08, Math.min(0.18, 0.12 + shine)).toFixed(3));
 
     const targetS = setParallaxFromScroll();
 
@@ -1523,15 +1412,6 @@
     rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2) + '%');
     rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2) + '%');
     rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
-
-    // header highlight smoothing
-    smoothHeaderX += (headerX - smoothHeaderX) * 0.18;
-    smoothHeaderY += (headerY - smoothHeaderY) * 0.18;
-    headerSmoothOpacity += (headerTargetOpacity - headerSmoothOpacity) * 0.14;
-
-    rootStyle.setProperty('--hhx', (smoothHeaderX*100).toFixed(2) + '%');
-    rootStyle.setProperty('--hhy', (smoothHeaderY*100).toFixed(2) + '%');
-    rootStyle.setProperty('--hhop', headerSmoothOpacity.toFixed(3));
 
     requestAnimationFrame(rafParallax);
   }
@@ -1582,7 +1462,7 @@
 
       toast("Загрузка...");
       loadReportsFromServer()
-        .then(() => { render(); bindScrollHaptics(); toast("Готово"); })
+        .then(() => { render(); toast("Готово"); })
         .catch(() => { toast("Без данных (временно)"); });
     } catch (e) {
       alert("Ошибка интерфейса: " + (e?.message || e));
