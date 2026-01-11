@@ -51,25 +51,6 @@
       -webkit-touch-callout:none;
     }
 
-    /* ✅ ГАРАНТИЯ ОТОБРАЖЕНИЯ ЛОГО */
-    .kfc-logo-wrap{
-      width:26px;
-      height:26px;
-      flex: 0 0 26px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:999px;
-      overflow:hidden;
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
-    }
-    .kfc-logo-wrap svg{
-      width:26px;
-      height:26px;
-      display:block;
-    }
-
     /* ===== ДИНАМИЧНЫЙ ФОН ===== */
     #bg{
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
@@ -581,6 +562,28 @@
 
     /* Wrapper height stabilization (visual 1:1) */
     .app-shell{ height: var(--appH); }
+
+    /* ===== ДОБАВЛЕНО: ЛОГО ПЕРЕД KFC (остальное не трогаем) ===== */
+    .kfc-mini-badge{
+      width:22px;
+      height:22px;
+      border-radius:9999px;
+      background: var(--kfc-red);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:
+        0 10px 22px rgba(0,0,0,.28),
+        inset 0 1px 0 rgba(255,255,255,.22);
+      border: 1px solid rgba(255,255,255,.14);
+      overflow:hidden;
+      flex: 0 0 auto;
+    }
+    .kfc-mini-badge svg{
+      width:16px;
+      height:16px;
+      display:block;
+    }
   </style>
 </head>
 
@@ -602,22 +605,24 @@
         </button>
 
         <div class="flex flex-col">
-          <!-- ✅ ЛОГО + KFC -->
+          <!-- ===== ИЗМЕНЕНО ТОЛЬКО ТУТ: добавили лого перед KFC ===== -->
           <div class="flex items-center gap-2">
-            <span class="kfc-logo-wrap" aria-hidden="true">
-              <!-- максимально простой SVG: гарантированно отрисуется в Telegram WebView -->
-              <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="32" cy="32" r="30" fill="#E4002B"/>
-                <path d="M12 20h40" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>
-                <path d="M12 44h40" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>
-                <text x="32" y="36" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="900" fill="#FFFFFF" style="letter-spacing:-1px;">
-                  KFC
-                </text>
+            <span class="kfc-mini-badge" aria-hidden="true">
+              <!-- компактный знак 1:1 как на скрине -->
+              <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KFC">
+                <text x="32" y="41"
+                      text-anchor="middle"
+                      font-family="Inter, -apple-system, system-ui, Arial"
+                      font-size="28"
+                      font-weight="900"
+                      fill="#FFFFFF"
+                      letter-spacing="1">KFC</text>
               </svg>
             </span>
 
             <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">KFC</h1>
           </div>
+          <!-- ===== /ИЗМЕНЕНО ТОЛЬКО ТУТ ===== -->
 
           <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:#ff2a4a;">LOSS CONTROL</p>
         </div>
