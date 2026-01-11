@@ -51,6 +51,25 @@
       -webkit-touch-callout:none;
     }
 
+    /* ✅ ГАРАНТИЯ ОТОБРАЖЕНИЯ ЛОГО */
+    .kfc-logo-wrap{
+      width:26px;
+      height:26px;
+      flex: 0 0 26px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:999px;
+      overflow:hidden;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+    }
+    .kfc-logo-wrap svg{
+      width:26px;
+      height:26px;
+      display:block;
+    }
+
     /* ===== ДИНАМИЧНЫЙ ФОН ===== */
     #bg{
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
@@ -583,28 +602,22 @@
         </button>
 
         <div class="flex flex-col">
-          <!-- ✅ ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: ЛОГО ПЕРЕД KFC -->
+          <!-- ✅ ЛОГО + KFC -->
           <div class="flex items-center gap-2">
-            <span aria-hidden="true" class="inline-flex items-center justify-center">
-              <!-- Inline SVG KFC logo (встроено, без файлов) -->
-              <svg width="22" height="22" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="display:block">
-                <!-- Примечание: это безопасная вставка "как есть" по месту.
-                     Если нужен 1-в-1 оригинальный SVG с деталями — пришли именно тот SVG,
-                     и я вставлю его полностью без изменений. -->
-                <rect x="48" y="32" width="416" height="448" rx="40" fill="white"/>
-                <rect x="92" y="86" width="122" height="270" fill="#E4002B"/>
-                <rect x="298" y="86" width="122" height="270" fill="#E4002B"/>
-                <path d="M256 106c-54 0-98 44-98 98 0 21 7 41 18 57l-18 46c-3 8 5 16 13 13l46-18c16 11 36 18 57 18 54 0 98-44 98-98s-44-98-98-98z"
-                      fill="#000"/>
-                <path d="M206 200c8-8 22-8 30 0m40 0c8-8 22-8 30 0" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
-                <path d="M220 260c12 14 60 14 72 0" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
-                <path d="M152 410h208" stroke="#000" stroke-width="48" stroke-linecap="round"/>
+            <span class="kfc-logo-wrap" aria-hidden="true">
+              <!-- максимально простой SVG: гарантированно отрисуется в Telegram WebView -->
+              <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="32" cy="32" r="30" fill="#E4002B"/>
+                <path d="M12 20h40" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>
+                <path d="M12 44h40" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>
+                <text x="32" y="36" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="900" fill="#FFFFFF" style="letter-spacing:-1px;">
+                  KFC
+                </text>
               </svg>
             </span>
 
             <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">KFC</h1>
           </div>
-          <!-- ✅ КОНЕЦ ЕДИНСТВЕННОГО ИЗМЕНЕНИЯ -->
 
           <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:#ff2a4a;">LOSS CONTROL</p>
         </div>
