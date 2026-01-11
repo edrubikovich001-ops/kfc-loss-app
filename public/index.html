@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
@@ -583,16 +583,7 @@
         </button>
 
         <div class="flex flex-col">
-          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/KFC_logo.svg/256px-KFC_logo.svg.png"
-              alt="KFC"
-              class="inline-block align-middle h-[22px] w-auto mr-2"
-              loading="eager"
-              decoding="async"
-            />
-            KFC
-          </h1>
+          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">KFC</h1>
           <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:#ff2a4a;">LOSS CONTROL</p>
         </div>
       </div>
@@ -1453,8 +1444,7 @@
     const main=document.getElementById('view-container');
     if(!main) return 0;
     const s=main.scrollTop||0;
-    const targetS = -(s*0.026);
-    return targetS;
+    return -(s*0.026);
   }
 
   function spotlightOn(){ targetSpotOpacity=1.0; }
