@@ -34,6 +34,9 @@
       --lpress: 0;
 
       --hdrShift: 0px;
+
+      /* iOS height stability */
+      --appH: 100vh;
     }
 
     html,body{height:100%;}
@@ -45,6 +48,7 @@
       overflow:hidden;
       -webkit-tap-highlight-color:transparent;
       user-select:none;
+      -webkit-touch-callout:none;
     }
 
     /* ===== ДИНАМИЧНЫЙ ФОН ===== */
@@ -156,6 +160,8 @@
           calc(var(--py) * 0.22 + var(--ay) * 0.70),
           0
         );
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
     }
 
     @keyframes linesWaveSlow{
@@ -190,6 +196,8 @@
       will-change: transform, opacity;
       animation: noiseMove 4.6s steps(6) infinite;
       transform: translate3d(calc(var(--ax) * 0.44), calc(var(--ay) * 0.44), 0);
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
     }
 
     @keyframes auroraFlowA{
@@ -380,6 +388,7 @@
       overscroll-behavior: contain;
       scroll-behavior: smooth;
       touch-action: pan-y;
+      contain: paint;
     }
     main::-webkit-scrollbar{display:none;}
 
@@ -391,6 +400,23 @@
       box-shadow: none !important;
     }
     body.is-scrolling .ios-card::after{ transition:none !important; }
+
+    /* ВО ВРЕМЯ СКРОЛЛА (iOS): заморозка тяжёлых эффектов, визуально почти незаметно */
+    body.is-scrolling #bg::before,
+    body.is-scrolling #bg::after,
+    body.is-scrolling #bg-lines,
+    body.is-scrolling #bg-noise,
+    body.is-scrolling #bg-pulse{
+      animation-play-state: paused !important;
+    }
+    body.is-scrolling .lens-card .lens-layer{
+      opacity: 0 !important;
+      transition: none !important;
+    }
+    body.is-scrolling #spotlight{
+      opacity: 0 !important;
+      transition: none !important;
+    }
 
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
@@ -487,6 +513,7 @@
       position:relative;
       overflow:hidden;
       transform: translate3d(0,0,0);
+      contain: paint;
     }
     .header-glass::before{
       content:"";
@@ -500,6 +527,8 @@
       pointer-events:none;
       transform: translate3d(calc(var(--px) * 0.14), calc(var(--py) * 0.14), 0);
       will-change: transform;
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
     }
     .header-glass .hdr-noise{
       position:absolute; inset:0;
@@ -531,15 +560,8 @@
       100%{ left:140%; opacity:.10; }
     }
 
-    /* ===== iOS: ускорение скролла (НЕ меняет дизайн, только пауза анимаций во время скролла) ===== */
-    body.is-scrolling #bg::before,
-    body.is-scrolling #bg::after,
-    body.is-scrolling #bg-lines,
-    body.is-scrolling #bg-noise,
-    body.is-scrolling #bg-pulse,
-    body.is-scrolling .header-glass::after{
-      animation-play-state: paused !important;
-    }
+    /* Wrapper height stabilization (visual 1:1) */
+    .app-shell{ height: var(--appH); }
   </style>
 </head>
 
@@ -551,7 +573,7 @@
   <div id="spotlight"></div>
   <div id="toast"></div>
 
-  <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
+  <div class="app-shell glass-ui max-w-[430px] mx-auto flex flex-col relative overflow-hidden z-10">
     <header class="header-glass pt-12 pb-4 px-6 flex items-center justify-between sticky top-0 z-50">
       <div class="hdr-noise"></div>
 
@@ -590,7 +612,7 @@
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
   const API = "/api";
 
-  /* ===== iOS супер-плавность без подпрыгиваний (НЕ влияет на ПК) ===== */
+  /* ===== iOS detection ===== */
   const isIOS = (() => {
     const ua = navigator.userAgent || "";
     const iOS = /iPad|iPhone|iPod/.test(ua);
@@ -598,8 +620,17 @@
     return iOS || iPadOS;
   })();
 
-  /* iOS: окно заморозки тяжёлых обновлений во время активного скролла */
-  let iosScrollFreezeUntil = 0;
+  /* ===== Stable height for iOS (no jumping with bars) ===== */
+  (function bindViewportHeight(){
+    const root = document.documentElement;
+    function setAppH(){
+      const h = window.innerHeight || 0;
+      if (h > 0) root.style.setProperty('--appH', h + 'px');
+    }
+    setAppH();
+    window.addEventListener('resize', setAppH, { passive:true });
+    window.addEventListener('orientationchange', setAppH, { passive:true });
+  })();
 
   (function applyIosScrollFix(){
     const main = document.getElementById('view-container');
@@ -610,19 +641,29 @@
     }
   })();
 
-  /* На iOS во время scroll отключаем тяжёлые transitions, чтобы не мигало/не прыгало */
+  /* ===== Smarter iOS scroll stability (freeze heavy work during scroll/inertia) ===== */
+  let __scrollLastTs = 0;
+  let __scrolling = false;
+
   (function bindIosScrollStability(){
     const main = document.getElementById('view-container');
     if(!main) return;
+
     let t = null;
     main.addEventListener('scroll', () => {
+      __scrollLastTs = performance.now();
       if (!isIOS) return;
-      document.body.classList.add('is-scrolling');
-
-      iosScrollFreezeUntil = performance.now() + 220;
-
+      if (!__scrolling) {
+        __scrolling = true;
+        document.body.classList.add('is-scrolling');
+      }
       clearTimeout(t);
-      t = setTimeout(() => document.body.classList.remove('is-scrolling'), 160);
+      // leave a bit longer to cover inertia end
+      t = setTimeout(() => {
+        // actual stop is decided in RAF too; this is just a backup
+        __scrolling = false;
+        document.body.classList.remove('is-scrolling');
+      }, 240);
     }, { passive:true });
   })();
 
@@ -1376,7 +1417,7 @@
     },{passive:true});
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (оптимизировано для iOS) ===== */
   const rootStyle=document.documentElement.style;
   let pointerX=0, pointerY=0;
   let smoothX=0, smoothY=0;
@@ -1418,16 +1459,39 @@
   window.addEventListener('touchcancel',()=>spotlightOff(),{passive:true});
 
   let _t0=performance.now();
-  function rafParallax(){
-    const nowPerf = performance.now();
 
-    // iOS: во время активного скролла не трогаем CSS vars (иначе WebView начинает "рвать" FPS).
-    if (isIOS && nowPerf < iosScrollFreezeUntil) {
+  // iOS “дорого и плавно”: фон обновляем реже, а во время скролла замораживаем
+  let _lastFrame = 0;
+  function getTargetFps(){
+    if (!isIOS) return 60;
+    // on iOS: softer background FPS
+    if (document.body.classList.contains('is-scrolling')) return 0; // freeze
+    return 40; // smooth + light
+  }
+
+  function rafParallax(now){
+    const targetFps = getTargetFps();
+    if (targetFps === 0) {
+      // keep checking for inertia end (and remove class smoothly)
+      if (isIOS) {
+        const dt = now - (__scrollLastTs || 0);
+        if (dt > 180 && document.body.classList.contains('is-scrolling')) {
+          __scrolling = false;
+          document.body.classList.remove('is-scrolling');
+        }
+      }
       requestAnimationFrame(rafParallax);
       return;
     }
 
-    const t=(nowPerf-_t0)/1000;
+    const minDt = 1000 / targetFps;
+    if (_lastFrame && (now - _lastFrame) < minDt) {
+      requestAnimationFrame(rafParallax);
+      return;
+    }
+    _lastFrame = now;
+
+    const t=(now-_t0)/1000;
 
     const ax = (Math.sin(t*1.18)*30 + Math.sin(t*0.48)*18 + Math.sin(t*0.20)*12);
     const ay = (Math.cos(t*1.04)*28 + Math.cos(t*0.42)*16 + Math.cos(t*0.18)*12);
@@ -1454,6 +1518,15 @@
     rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2)+'%');
     rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2)+'%');
     rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
+
+    // extra: if inertia ended but class still present, clear it
+    if (isIOS && document.body.classList.contains('is-scrolling')) {
+      const dt = now - (__scrollLastTs || 0);
+      if (dt > 180) {
+        __scrolling = false;
+        document.body.classList.remove('is-scrolling');
+      }
+    }
 
     requestAnimationFrame(rafParallax);
   }
