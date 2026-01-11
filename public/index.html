@@ -25,8 +25,8 @@
       /* Автоволна (всегда) */
       --ax: 0px;
       --ay: 0px;
-      --aw: 0.12;
-      --shine: 0.14;
+      --aw: 0.12;   /* wave intensity */
+      --shine: 0.14;/* wave brightness */
 
       /* Spotlight */
       --sx: 50%;
@@ -50,15 +50,15 @@
       user-select:none;
     }
 
-    /* ===== ДИНАМИЧНЫЙ ФОН ===== */
+    /* ===== ДИНАМИЧНЫЙ ФОН (всегда “живой”) ===== */
     #bg{
       position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
       background:
-        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.22), transparent 60%),
-        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.22), transparent 60%),
-        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.18), transparent 60%),
-        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.22), transparent 60%),
-        linear-gradient(180deg, rgba(0,0,0,.42), rgba(0,0,0,.78));
+        radial-gradient(1200px 800px at 20% 30%, rgba(42,109,187,.20), transparent 60%),
+        radial-gradient(900px 700px at 80% 20%, rgba(74,31,122,.20), transparent 60%),
+        radial-gradient(900px 800px at 70% 80%, rgba(139,47,141,.16), transparent 60%),
+        radial-gradient(1000px 700px at 25% 85%, rgba(26,46,106,.20), transparent 60%),
+        linear-gradient(180deg, rgba(0,0,0,.50), rgba(0,0,0,.80));
     }
 
     #bg::before, #bg::after{
@@ -66,16 +66,17 @@
       position:absolute;
       inset:-30%;
       background:
-        radial-gradient(closest-side at 22% 34%, rgba(42,109,187,.40), transparent 55%),
-        radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.38), transparent 55%),
-        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.32), transparent 58%),
-        radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.38), transparent 58%);
+        radial-gradient(closest-side at 22% 34%, rgba(42,109,187,.38), transparent 55%),
+        radial-gradient(closest-side at 76% 24%, rgba(74,31,122,.36), transparent 55%),
+        radial-gradient(closest-side at 70% 80%, rgba(139,47,141,.30), transparent 58%),
+        radial-gradient(closest-side at 30% 86%, rgba(26,46,106,.36), transparent 58%);
       filter: blur(20px) saturate(130%);
       opacity: .98;
       will-change: transform, filter, opacity;
       transform: translate3d(0,0,0);
     }
 
+    /* Слой 1: сильнее и быстрее */
     #bg::before{
       mix-blend-mode: screen;
       animation: auroraFlowA 7.6s ease-in-out infinite;
@@ -88,6 +89,7 @@
         scale(1.03);
     }
 
+    /* Слой 2: мягче, глубже */
     #bg::after{
       opacity:.78;
       filter: blur(32px) saturate(140%);
@@ -102,6 +104,7 @@
         scale(1.05);
     }
 
+    /* Волнообразная яркость */
     #bg-pulse{
       position:fixed; inset:-15%; z-index:2; pointer-events:none;
       background:
@@ -121,9 +124,10 @@
         );
     }
 
+    /* Полосы: заметнее + переливы волной */
     #bg-lines{
       position:fixed; inset:0; z-index:1; pointer-events:none;
-      opacity:.22;
+      opacity:.22; /* заметнее */
       background:
         repeating-linear-gradient(
           135deg,
@@ -193,7 +197,7 @@
       100%{ transform: translate3d(calc(var(--ax) * 0.30 - 40px), calc(var(--ay) * 0.30 + 20px), 0); }
     }
 
-    /* ===== SPOTLIGHT ===== */
+    /* ===== SPOTLIGHT под пальцем ===== */
     #spotlight{
       position:fixed; inset:0; z-index:3; pointer-events:none;
       opacity: var(--sop);
@@ -356,15 +360,16 @@
     .btn-liquid:active::after{ opacity:1; animation: btnShine .48s ease-out; }
     @keyframes btnShine{ 0%{left:-60%;opacity:0;} 10%{opacity:1;} 100%{left:130%;opacity:0;} }
 
-    /* ===== Плавный быстрый скролл ===== */
+    /* ===== ВАЖНО: быстрый и плавный скролл ===== */
     main{
       scroll-behavior: smooth;
-      -webkit-overflow-scrolling: touch;
+      -webkit-overflow-scrolling: touch; /* iOS быстрый */
       overscroll-behavior: contain;
       scroll-snap-type: none;
     }
     main::-webkit-scrollbar{display:none;}
 
+    /* Остальное UI */
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
     .wheel::-webkit-scrollbar{display:none;}
@@ -445,20 +450,17 @@
       color:#eafff1;
     }
 
-    /* ===== iOS SCROLL STABILITY FIX (ВАЖНО) =====
-       во время скролла отключаем hover/lens/active чтобы не было дерганий */
-    body.is-scrolling .card-anim,
-    body.is-scrolling .lens-card,
-    body.is-scrolling button{
-      pointer-events:none !important;
+    /* ===== FIX iOS “нервозного” скролла (НЕ меняя дизайн) ===== */
+    body.is-scrolling .card-anim{
+      transition: none !important;     /* убираем дерганые трансформации во время скролла */
     }
     body.is-scrolling .card-anim:hover,
     body.is-scrolling .card-anim:active{
-      transform:none !important;
-      box-shadow:none !important;
+      transform: none !important;
+      box-shadow: 0 12px 30px rgba(0,0,0,.35) !important;
     }
     body.is-scrolling .lens-layer{
-      opacity:0 !important;
+      opacity: 0 !important;           /* линза не мигает при прокрутке */
     }
   </style>
 </head>
@@ -579,7 +581,7 @@
     toast._t = setTimeout(()=>el.classList.remove('show'), 1400);
   }
 
-  /* ===== HAPTIC ===== */
+  /* ===== HAPTIC (WOW) ===== */
   const HAPTIC = tg?.HapticFeedback;
   let _hLast = 0;
   function hapticImpact(style="light"){
@@ -672,7 +674,7 @@
     primaryBtn.onclick = () => { hapticImpact("light"); handler(); };
   }
 
-  /* ===== ФИКС ПОИСКА: фокус не слетает ===== */
+  /* ===== ФИКС ПОИСКА: фокус/курсор сохраняются ===== */
   let renderScheduled = false;
   function scheduleRenderPreserveFocus(activeId, selStart, selEnd) {
     if (renderScheduled) return;
@@ -702,7 +704,7 @@
     scheduleRenderPreserveFocus(inputId, selStart, selEnd);
   }
 
-  /* ===== УСКОРЕНИЕ: lucide ===== */
+  /* ===== УСКОРЕНИЕ: lucide обновляем не на каждом шаге синхронно ===== */
   let _iconsScheduled = false;
   function scheduleIcons(){
     if(_iconsScheduled) return;
@@ -1030,6 +1032,7 @@
 
     scheduleIcons();
     attachLensHandlers();
+    bindScrollStability(); /* важный фикс iPhone */
   }
 
   function renderRestList(reports, total) {
@@ -1312,7 +1315,7 @@
     return { h: h ? Math.round(h.scrollTop/52) : 0, m: m ? Math.round(m.scrollTop/52) : 0 };
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (WOW) ===== */
   const rootStyle = document.documentElement.style;
   let pointerX = 0, pointerY = 0;
   let smoothX = 0, smoothY = 0;
@@ -1322,6 +1325,30 @@
   let smoothSpotX = 0.5, smoothSpotY = 0.4;
   let targetSpotOpacity = 0.0;
   let smoothSpotOpacity = 0.0;
+
+  /* ===== ФИКС iPhone: режим скролла ===== */
+  let IS_SCROLLING = false;
+  let _scrollStopT = null;
+
+  function bindScrollStability(){
+    const main = document.getElementById('view-container');
+    if(!main || main.__stableBound) return;
+    main.__stableBound = true;
+
+    main.addEventListener('scroll', () => {
+      // Включаем режим “скроллим”
+      if(!IS_SCROLLING){
+        IS_SCROLLING = true;
+        document.body.classList.add('is-scrolling');
+      }
+
+      if(_scrollStopT) clearTimeout(_scrollStopT);
+      _scrollStopT = setTimeout(() => {
+        IS_SCROLLING = false;
+        document.body.classList.remove('is-scrolling');
+      }, 120);
+    }, { passive:true });
+  }
 
   function setParallaxFromPointer(clientX, clientY){
     const w = window.innerWidth || 1;
@@ -1364,31 +1391,19 @@
   window.addEventListener('touchend', () => spotlightOff(), { passive:true });
   window.addEventListener('touchcancel', () => spotlightOff(), { passive:true });
 
-  /* ===== iOS SCROLL STABILITY FIX (JS) ===== */
-  function bindScrollHaptics(){
-    const main = document.getElementById('view-container');
-    if(!main || main.__hBound) return;
-    main.__hBound = true;
+  /* УБРАЛ haptic на scroll (он тормозил iPhone). Оставил на кнопках. */
+  function bindScrollHaptics(){ /* intentionally empty (perf) */ }
 
-    let scrollTimer = null;
-
-    main.addEventListener('scroll', () => {
-      document.body.classList.add('is-scrolling');
-
-      if(scrollTimer) clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => {
-        document.body.classList.remove('is-scrolling');
-      }, 120);
-    }, { passive:true });
-  }
-
-  /* Автоволна фона */
+  /* Автоволна фона: даже если ничего не трогать */
   let _t0 = performance.now();
   function rafParallax(){
     const t = (performance.now() - _t0) / 1000;
 
+    // Автоволна: синусы дают живое движение
     const ax = (Math.sin(t * 0.85) * 18 + Math.sin(t * 0.33) * 10);
     const ay = (Math.cos(t * 0.72) * 16 + Math.cos(t * 0.27) * 9);
+
+    // Яркость/перелив волной
     const shine = (Math.sin(t * 1.05) * 0.05 + Math.sin(t * 0.41) * 0.04);
 
     rootStyle.setProperty('--ax', ax.toFixed(2) + 'px');
@@ -1416,7 +1431,7 @@
     requestAnimationFrame(rafParallax);
   }
 
-  /* ===== ЛИНЗА: реакция карточек ===== */
+  /* ===== ЛИНЗА: реакция карточек (оптимизация: не считать во время скролла) ===== */
   function attachLensHandlers(){
     const cards = document.querySelectorAll('.lens-card');
     cards.forEach(card => {
@@ -1424,6 +1439,9 @@
       card.__lensBound = true;
 
       const setXY = (clientX, clientY) => {
+        // ФИКС iPhone: если идёт scroll — не трогаем линзу (убираем лаг/прыжки)
+        if (IS_SCROLLING) return;
+
         const r = card.getBoundingClientRect();
         const x = ((clientX - r.left) / Math.max(1, r.width)) * 100;
         const y = ((clientY - r.top) / Math.max(1, r.height)) * 100;
@@ -1458,6 +1476,7 @@
     try {
       render();
       bindScrollHaptics();
+      bindScrollStability();
       requestAnimationFrame(rafParallax);
 
       toast("Загрузка...");
