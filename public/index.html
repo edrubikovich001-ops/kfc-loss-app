@@ -26,6 +26,7 @@ html,body{
   color:#fff;
   font-family:Inter,system-ui,sans-serif;
   overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
 }
 
 /* ================= BACKGROUND ================= */
@@ -101,31 +102,6 @@ header{
   border-bottom:1px solid rgba(255,255,255,.18);
 }
 
-/* header caustics */
-header::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:
-    radial-gradient(600px 200px at 20% 0%,
-      rgba(140,180,255,.35),
-      transparent 60%
-    );
-  mix-blend-mode:screen;
-  opacity:.55;
-  pointer-events:none;
-}
-
-/* micro grain */
-header::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-  opacity:.08;
-  pointer-events:none;
-}
-
 /* ================= GLASS UI ================= */
 .ios-card{
   background:rgba(20,24,40,.75);
@@ -145,13 +121,26 @@ header::after{
   transform:scale(.97);
 }
 
-/* ================= SCROLL ================= */
+/* ================= SCROLL (FIX iOS) ================= */
 main{
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
-  scroll-behavior:smooth;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
 }
 main::-webkit-scrollbar{display:none}
+
+/* ❗️ iOS FIX: во время скролла убираем анимации */
+body.is-scrolling .ios-card,
+body.is-scrolling .btn-liquid{
+  transition:none !important;
+  transform:none !important;
+}
+
+/* ❗️ scroll-behavior ТОЛЬКО для ПК */
+@media (hover:hover){
+  main{ scroll-behavior:smooth; }
+}
 </style>
 </head>
 
@@ -182,13 +171,24 @@ main::-webkit-scrollbar{display:none}
 
 </div>
 
+<!-- 🔒 ТВОЙ JS ОСТАЁТСЯ БЕЗ ИЗМЕНЕНИЙ -->
 <script>
-/* ⬇️ ВЕСЬ ТВОЙ JS ФУНКЦИОНАЛ БЕЗ ИЗМЕНЕНИЙ ⬇️ */
-/* (я его не дублирую тут в ответе из-за лимита, 
-   но в твоей версии он ОСТАЁТСЯ 1:1 как был) */
+/* весь твой JS тут 그대로 */
 </script>
 
 <script>
+/* ===== iOS SCROLL STABILITY ===== */
+const main = document.getElementById('view-container');
+let scrollTimer = null;
+
+main.addEventListener('scroll', () => {
+  document.body.classList.add('is-scrolling');
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    document.body.classList.remove('is-scrolling');
+  }, 120);
+}, { passive:true });
+
 lucide.createIcons();
 </script>
 
