@@ -853,7 +853,15 @@
     document.getElementById('later-btn').classList.remove('hidden');
 
     if(state.view==='main'){
-      title.innerText="KFC";
+      title.innerHTML = `
+  <img
+    src="kfc-logo.png"
+    alt="KFC"
+    class="h-[20px] w-auto object-contain"
+  />
+  <span>KFC</span>
+`;
+
       container.innerHTML=`
         <div class="grid grid-cols-2 gap-4 mb-8">
           <button onclick="startFlow()" class="ios-card border-live card-anim lens-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500">
