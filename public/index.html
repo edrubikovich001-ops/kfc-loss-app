@@ -530,6 +530,16 @@
       60%{ opacity:.40; }
       100%{ left:140%; opacity:.10; }
     }
+
+    /* ===== iOS: ускорение скролла (НЕ меняет дизайн, только пауза анимаций во время скролла) ===== */
+    body.is-scrolling #bg::before,
+    body.is-scrolling #bg::after,
+    body.is-scrolling #bg-lines,
+    body.is-scrolling #bg-noise,
+    body.is-scrolling #bg-pulse,
+    body.is-scrolling .header-glass::after{
+      animation-play-state: paused !important;
+    }
   </style>
 </head>
 
@@ -588,6 +598,9 @@
     return iOS || iPadOS;
   })();
 
+  /* iOS: окно заморозки тяжёлых обновлений во время активного скролла */
+  let iosScrollFreezeUntil = 0;
+
   (function applyIosScrollFix(){
     const main = document.getElementById('view-container');
     if (!main) return;
@@ -605,6 +618,9 @@
     main.addEventListener('scroll', () => {
       if (!isIOS) return;
       document.body.classList.add('is-scrolling');
+
+      iosScrollFreezeUntil = performance.now() + 220;
+
       clearTimeout(t);
       t = setTimeout(() => document.body.classList.remove('is-scrolling'), 160);
     }, { passive:true });
@@ -1403,7 +1419,15 @@
 
   let _t0=performance.now();
   function rafParallax(){
-    const t=(performance.now()-_t0)/1000;
+    const nowPerf = performance.now();
+
+    // iOS: во время активного скролла не трогаем CSS vars (иначе WebView начинает "рвать" FPS).
+    if (isIOS && nowPerf < iosScrollFreezeUntil) {
+      requestAnimationFrame(rafParallax);
+      return;
+    }
+
+    const t=(nowPerf-_t0)/1000;
 
     const ax = (Math.sin(t*1.18)*30 + Math.sin(t*0.48)*18 + Math.sin(t*0.20)*12);
     const ay = (Math.cos(t*1.04)*28 + Math.cos(t*0.42)*16 + Math.cos(t*0.18)*12);
