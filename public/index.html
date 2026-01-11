@@ -34,9 +34,6 @@
       --lpress: 0;
 
       --hdrShift: 0px;
-
-      /* iOS height stability */
-      --appH: 100vh;
     }
 
     html,body{height:100%;}
@@ -48,7 +45,6 @@
       overflow:hidden;
       -webkit-tap-highlight-color:transparent;
       user-select:none;
-      -webkit-touch-callout:none;
     }
 
     /* ===== ДИНАМИЧНЫЙ ФОН ===== */
@@ -160,8 +156,6 @@
           calc(var(--py) * 0.22 + var(--ay) * 0.70),
           0
         );
-      backface-visibility:hidden;
-      -webkit-backface-visibility:hidden;
     }
 
     @keyframes linesWaveSlow{
@@ -196,8 +190,6 @@
       will-change: transform, opacity;
       animation: noiseMove 4.6s steps(6) infinite;
       transform: translate3d(calc(var(--ax) * 0.44), calc(var(--ay) * 0.44), 0);
-      backface-visibility:hidden;
-      -webkit-backface-visibility:hidden;
     }
 
     @keyframes auroraFlowA{
@@ -388,7 +380,6 @@
       overscroll-behavior: contain;
       scroll-behavior: smooth;
       touch-action: pan-y;
-      contain: paint;
     }
     main::-webkit-scrollbar{display:none;}
 
@@ -400,23 +391,6 @@
       box-shadow: none !important;
     }
     body.is-scrolling .ios-card::after{ transition:none !important; }
-
-    /* ВО ВРЕМЯ СКРОЛЛА (iOS): заморозка тяжёлых эффектов, визуально почти незаметно */
-    body.is-scrolling #bg::before,
-    body.is-scrolling #bg::after,
-    body.is-scrolling #bg-lines,
-    body.is-scrolling #bg-noise,
-    body.is-scrolling #bg-pulse{
-      animation-play-state: paused !important;
-    }
-    body.is-scrolling .lens-card .lens-layer{
-      opacity: 0 !important;
-      transition: none !important;
-    }
-    body.is-scrolling #spotlight{
-      opacity: 0 !important;
-      transition: none !important;
-    }
 
     .wheel-box{display:flex;align-items:center;background:rgba(44,44,46,.86);border-radius:12px;height:var(--item-height);padding:0 10px;border:1px solid rgba(255,255,255,.12);}
     .wheel{height:var(--item-height);overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;width:44px;text-align:center;}
@@ -513,7 +487,6 @@
       position:relative;
       overflow:hidden;
       transform: translate3d(0,0,0);
-      contain: paint;
     }
     .header-glass::before{
       content:"";
@@ -527,8 +500,6 @@
       pointer-events:none;
       transform: translate3d(calc(var(--px) * 0.14), calc(var(--py) * 0.14), 0);
       will-change: transform;
-      backface-visibility:hidden;
-      -webkit-backface-visibility:hidden;
     }
     .header-glass .hdr-noise{
       position:absolute; inset:0;
@@ -559,9 +530,6 @@
       60%{ opacity:.40; }
       100%{ left:140%; opacity:.10; }
     }
-
-    /* Wrapper height stabilization (visual 1:1) */
-    .app-shell{ height: var(--appH); }
   </style>
 </head>
 
@@ -573,7 +541,7 @@
   <div id="spotlight"></div>
   <div id="toast"></div>
 
-  <div class="app-shell glass-ui max-w-[430px] mx-auto flex flex-col relative overflow-hidden z-10">
+  <div class="glass-ui max-w-[430px] mx-auto h-screen flex flex-col relative overflow-hidden z-10">
     <header class="header-glass pt-12 pb-4 px-6 flex items-center justify-between sticky top-0 z-50">
       <div class="hdr-noise"></div>
 
@@ -583,7 +551,15 @@
         </button>
 
         <div class="flex flex-col">
-          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer">KFC</h1>
+          <!-- ЛОГО ПЕРЕД KFC (остальное 1:1). -->
+          <h1 id="header-title" class="text-xl font-black uppercase tracking-tighter glass-shimmer flex items-center gap-2">
+            <img
+              id="kfc-logo"
+              alt="KFC"
+              class="w-7 h-7 shrink-0"
+              src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNC4wLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iU3RhdGljX0xvZ29zIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDUxMiA1MTI7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+DQogLnN0MHtmaWxsOiNGRkZGRkY7fQ0KCS5zdDF7ZmlsbDojRTAwMDJCO30NCjwv c3R5bGU+DQo8cGF0aCBkPSJNNDYzLjIsNDg5LjVINDguOGMtMTQuNSwwLTI2LjMtMTEuOC0yNi4zLTI2LjNWNDguOEMyMi41LDM0LjMsMzQuMywyMi41LDQ4LjgsMjIuNWg0MTQuNQ0KYzE0LjUsMCwyNi4zLDExLjgsMjYuMywyNi4zdjQxNC40QzQ4OS41LDQ3Ny43LDQ3Ny43LDQ4OS41LDQ2My4yLDQ4OS41eiIvPg0KPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ3NC4yLDM4LjJINzQuM0M1Ni40LDM4LjIsNDEuOSw1Mi43LDQxLjksNzAuNnYzNzAuOQ0KYzAsMTcuOSwxNC41LDMyLjQsMzIuNCwzMi40aDM5OS45YzE3LjksMCwzMi40LTE0LjUsMzIuNC0zMi40VjcwLjYNCkM1MDYuNiw1Mi43LDQ5Mi4xLDM4LjIsNDc0LjIsMzguMnoiLz4NCjxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik00NDYuMSwxMDAuOXYyNjcuNGgtNTkuNlYxMDAuOUg0NDYuMXoiLz4NCjxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMjUuNSwxMDAuOXYyNjcuNGg1OS42VjEwMC45SDEyNS41eiIvPg0KPHBhdGggZD0iTTIzOS41LDIyMi45Yy0wLjYsMS42LTEuMiwzLjEtMS45LDQuN2MtMC44LDEuNy0xLjksMy4yLTMuMyw0LjZNMjc3LDIyMi45YzAuNiwxLjYsMS4yLDMuMSwxLjksNC43DQoJYzAuOCwxLjcsMS45LDMuMiwzLjMsNC42Ii8+DQo8cGF0aCBkPSJNMjgyLjMsMjM0LjdsLTEuMi02LjJjLTAuNi0yLjctMS4yLTUuNC0xLjctOC4xDQoJYy0wLjYtMi43LTEuMi01LjQtMS43LTguMWMtMS0zLjktMi0xMC4yLTMuMS0xNC4xYy0xLjEtMy44LTIuNi03LjUtNC41LTEwLjcNCgkJYy0xLjktMy4yLTQuMS02LjEtNi44LTguNmMtMi44LTIuNS02LTQuNC05LjUtNS44Yy0wLjEtMC4xLTAuMi0wLjEtMC4zLTAuMQ0KCQljLTAuMSwwLTAuMiwwLTAuMywwLjFjLTMuNSwxLjQtNi42LDMuMy05LjUsNS44Yy0yLjgsMi41LTQuOSw1LjQtNi44LDguNg0KCQljLTEuOSwzLjItMy40LDYuOC00LjUsMTAuN2MtMS4yLDMuOS0yLjEsMTAuMi0zLjEsMTQuMWMtMC42LDIuNy0xLjIsNS40LTEuNyw4LjENCgkJYy0wLjYsMi43LTEuMSw1LjQtMS43LDguMWwtMS4yLDYuM2MtMS44LDguOS03LjEsMjUuNC01LjYsMzIuMmMxLjQsNi44LDI2LjgsMTEuNiwyNi44LDExLjYNCgkJYzAsOS40LDAsMjIuOSwtMC4xLDMxLjljMCwxLjItMC4yLDIuMy0wLjYsMy40Yy0wLjMsMS4yLTEsMi4zLTIsMy4yYy0xLDAuOSLTAuMyLDUuNi0wLjMsNS42bDIwLjQsMjEuNmw0LjctMTUuNWwtMC40LTAuNEMyNjEuNiwzMzIuNiwyNjIuMywyMzQuNywyODIuMywyMzQuN3ogTTI4MS45LDIzNC43Yy0xOC45LTMuNS0xOS4xLTI1LjgtMjUuOS0yNS44Yy0wLjIsMC0wLjMsMC4xLTAuNSwwLjENCgkJYy0xLjYsMC44LTIuMiwyLjktMi4yLDQuNGMwLDcuNCwxMC45LDEyLjUsMjguMiwxMy41Yy0xLjQsMTIuMy0zLjgsMjUuMy02LjQsNDAuMw0KCQljLTIuNywxNS0yLjIsMjEuMS0yLjEsMjEuNGMwLDAsMC0wLjEsMC0wLjJjMC0wLjIsMC0wLjQsMC4xLTAuNmMwLTAuMSLTAuMSLTAuMiLTAuMSLTAuMw0KCQljMC0wLjMsMC0wLjUsMC0wLjgsMC0wLjQsMC0wLjctMC4xLTEuMWMwLTAuMy0wLjEtMC42LTAuMSLTAuOWMwLTAuMy0wLjEtMC42LTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMy0wLjEtMC42LTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWcwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWcwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWcwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWcwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWcwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOWMwLTAuMyLTAuMSLTAuNiLTAuMSLTAuOQ0KCQljMC0wLjMtMC4xLTAuNiLTAuMSLTAuOWM1LjItNS44LDkuOS0xMy4yLDkuOS0yMi4yYzAsLTEuNS0wLjYtMy42LTIuMi00LjRjLTAuMS0wLjEtMC4zLTAuMSLTAuNS0wLjENCgkJQzMwMSwyMDguOCwzMDEuNCwyMzEuMiwyODEuOSwyMzQuN3oiLz4NCjxwYXRoIGQ9Ik0yNTYsMTkwLjVjMTAuMywwLDE4LjYtOC4zLDE4LjYtMTguNmMwLTEwLjMtOC4zLTE4LjYtMTguNi0xOC42Yy0xMC4zLDAtMTguNiw4LjMtMTguNiwxOC42DQoJQzIzNy40LDE4Mi4yLDI0NS43LDE5MC41LDI1NiwxOTAuNXoiLz4NCjxwYXRoIGQ9Ik0zMDcuNCwyMjUuNmMyLjMtMTEuNC0wLjMtMzUuMy0xMC4yLTU4LjFjLTEuNC0yLjgtMy44LTkuMi0xMC40LTE1LjZzLTE0LjItMTAuNi0xNC42LTEwLjYNCgkJbC0xMC42LDI0LjFsMi44LDcuNCwxMy44LTExLjVsNS42LDEzLjdMNjUyLDI1Ni4yIi8+DQo8cGF0aCBkPSJNMjE0LjYsMTI2LjZjMC4xLDAuMSw3LjcsNC4yLDE0LjQsMTAuNmM2LjYsNi40LDkuMSwxMi44LDEwLjQsMTUuNmM5LjksMjIuOSwxMi41LDQ2LjcsMTAuMiw1OC4xbC0wLjQsNS42bC0zLjMtNC42bC01LjYtMTMuN2wtMTMuOCwxMS41bC0yLjgtNy40TCIxLC0xIi8+DQo8cGF0aCBkPSJNMjM4LDE0Ni43bC0wLjMtNy40bC0wLjktNi42bC0yLjQtMi41bC0yLjk4LDEuMDM0bC0xLjExLDMuMTgxbC0wLjQsMi44bC0wLjMsNC4xbC4yLDMuN2wxLjksMy44DQoJbDIuMywyLjdsMS44LDEuMWwzLjEtMS44bDIuMi0yLjZMNTM4LDI0NSIvPg0KPHBhdGggZD0iTTI3NCw0MjkuNmMtMC40LTAuOC0wLjktMS42LTEuNS0yLjRsLTExLjgtMTIuNmwtMS4yLDYuOGwxMC40LDExLjFjMS4zLDEuNCwzLjUsMi41LDYuMiwyLjUNCgkJYzEsMCwxLjktMC4yLDIuNy0wLjZjMS4xLTAuNSwxLjYtMS4zLDEuOC0yLjFjMC4xLTAuOCLTAuMi0xLjMtMC40LTEuN1ogTTIzOC4xLDQzMi40bDEwLjMtMTEuMWwtMS4yLTYuOGwtMTEuOCwxMi42Yy0wLjYsMC44LTEuMSwxLjYtMS41LDIuNGMtMC4yLDAuNSLTAuNSwxLTAuNCwxLjYNCgkJYzAuMSwwLjgsMC43LDEuNywxLjgsMi4xYzAuOCwwLjQsMS44LDAuNiwyLjcsMC42QzIzNC42LDQzNC45LDIzNi44LDQzMy44LDIzOC4xLDQzMi40eiIvPg0KPHBhdGggZD0iTTI1NiwyNTkuM2MtMTIuNSwwLTIyLjYsNy43LTI0LjIsMTcuNWgtMy44YzAuMywyLjYsMS4xLDUuMiwzLjEsNy43YzAuMSwwLjIsMC4zLDAuNCLTAuMSLTAuN2MtMC4zLTEuNi0wLjUtMy4xLTAuOC-4.7H..." />
+            <span id="header-title-text">KFC</span>
+          </h1>
           <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:#ff2a4a;">LOSS CONTROL</p>
         </div>
       </div>
@@ -612,24 +588,20 @@
   if (tg) { try { tg.ready(); tg.expand(); } catch (_) {} }
   const API = "/api";
 
-  /* ===== iOS detection ===== */
+  /* ===== Заголовок: меняем текст, не ломая лого (поведение 1:1). ===== */
+  function setHeaderTitleText(txt){
+    const t = document.getElementById('header-title-text');
+    if (t) { t.textContent = txt; return; }
+    const h = document.getElementById('header-title');
+    if (h) h.textContent = txt;
+  }
+
+  /* ===== iOS супер-плавность без подпрыгиваний (НЕ влияет на ПК) ===== */
   const isIOS = (() => {
     const ua = navigator.userAgent || "";
     const iOS = /iPad|iPhone|iPod/.test(ua);
     const iPadOS = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     return iOS || iPadOS;
-  })();
-
-  /* ===== Stable height for iOS (no jumping with bars) ===== */
-  (function bindViewportHeight(){
-    const root = document.documentElement;
-    function setAppH(){
-      const h = window.innerHeight || 0;
-      if (h > 0) root.style.setProperty('--appH', h + 'px');
-    }
-    setAppH();
-    window.addEventListener('resize', setAppH, { passive:true });
-    window.addEventListener('orientationchange', setAppH, { passive:true });
   })();
 
   (function applyIosScrollFix(){
@@ -641,29 +613,16 @@
     }
   })();
 
-  /* ===== Smarter iOS scroll stability (freeze heavy work during scroll/inertia) ===== */
-  let __scrollLastTs = 0;
-  let __scrolling = false;
-
+  /* На iOS во время scroll отключаем тяжёлые transitions, чтобы не мигало/не прыгало */
   (function bindIosScrollStability(){
     const main = document.getElementById('view-container');
     if(!main) return;
-
     let t = null;
     main.addEventListener('scroll', () => {
-      __scrollLastTs = performance.now();
       if (!isIOS) return;
-      if (!__scrolling) {
-        __scrolling = true;
-        document.body.classList.add('is-scrolling');
-      }
+      document.body.classList.add('is-scrolling');
       clearTimeout(t);
-      // leave a bit longer to cover inertia end
-      t = setTimeout(() => {
-        // actual stop is decided in RAF too; this is just a backup
-        __scrolling = false;
-        document.body.classList.remove('is-scrolling');
-      }, 240);
+      t = setTimeout(() => document.body.classList.remove('is-scrolling'), 160);
     }, { passive:true });
   })();
 
@@ -805,7 +764,6 @@
   function render(){
     const container=document.getElementById('view-container');
     const backBtn=document.getElementById('back-btn');
-    const title=document.getElementById('header-title');
 
     container.innerHTML='';
     backBtn.classList.toggle('hidden', state.view==='main');
@@ -813,7 +771,7 @@
     document.getElementById('later-btn').classList.remove('hidden');
 
     if(state.view==='main'){
-      title.innerText="KFC";
+      setHeaderTitleText("KFC");
       container.innerHTML=`
         <div class="grid grid-cols-2 gap-4 mb-8">
           <button onclick="startFlow()" class="ios-card border-live card-anim lens-card p-6 flex flex-col items-center gap-3 border-l-4 border-red-500">
@@ -823,7 +781,7 @@
           </button>
           <button onclick="navigate('analytics_period')" class="ios-card border-live card-anim lens-card p-6 flex flex-col items-center gap-3">
             <div class="lens-layer"></div>
-            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-300"><i data-lucide="bar-chart-3"></i></div>
+            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center textz! text-green-300"><i data-lucide="bar-chart-3"></i></div>
             <span class="font-bold text-[10px] uppercase tracking-widest text-gray-100">Аналитика</span>
           </button>
         </div>
@@ -862,7 +820,7 @@
     }
 
     else if (state.view === 'managers') {
-      title.innerText = state.editId ? "Менеджер (редактирование)" : "Менеджер";
+      setHeaderTitleText(state.editId ? "Менеджер (редактирование)" : "Менеджер");
       container.innerHTML = `
         <div class="search-hint">поиск</div>
         <div class="search-box ios-card border-live lens-card">
@@ -885,7 +843,7 @@
     }
 
     else if (state.view === 'restaurants') {
-      title.innerText = "Ресторан";
+      setHeaderTitleText("Ресторан");
       container.innerHTML = `
         <div class="search-hint">поиск</div>
         <div class="search-box ios-card border-live lens-card">
@@ -908,7 +866,7 @@
     }
 
     else if (state.view === 'reasons') {
-      title.innerText = "Причина";
+      setHeaderTitleText("Причина");
       ["Внешние факторы","Внутренние факторы","Отсутствие продукта","Персонал"].forEach(r => {
         container.innerHTML += `<button onclick="state.reason='${r}';navigate('comment')"
           class="w-full p-5 mb-3 ios-card border-live card-anim lens-card text-left font-bold flex justify-between items-center">
@@ -918,7 +876,7 @@
     }
 
     else if (state.view === 'comment') {
-      title.innerText = "Комментарий";
+      setHeaderTitleText("Комментарий");
       container.innerHTML = `<div class="ios-card border-live lens-card p-2">
         <div class="lens-layer"></div>
         <textarea id="comm" class="w-full bg-transparent border-none outline-none text-white p-3 h-32" placeholder="Укажите детали...">${state.comment || ''}</textarea>
@@ -929,7 +887,7 @@
     else if (state.view === 'calendar') {
       const isStart = state.stage === 'start';
       const cur = isStart ? state.start : state.end;
-      title.innerText = isStart ? "Начало" : "Конец";
+      setHeaderTitleText(isStart ? "Начало" : "Конец");
 
       const firstDay = (new Date(cur.year, cur.month, 1).getDay() || 7) - 1;
       const daysInMonth = new Date(cur.year, cur.month + 1, 0).getDate();
@@ -985,7 +943,7 @@
     }
 
     else if (state.view === 'sum') {
-      title.innerText = "Сумма";
+      setHeaderTitleText("Сумма");
       container.innerHTML = `
         <div class="ios-card border-live lens-card p-4 mb-4 border-l-4 border-blue-500">
           <div class="lens-layer"></div>
@@ -1007,7 +965,7 @@
     }
 
     else if (state.view === 'analytics_period') {
-      title.innerText = "Аналитика";
+      setHeaderTitleText("Аналитика");
       [{id:'today',n:'Сегодня'},{id:'week',n:'Эта неделя'},{id:'custom',n:'Свой диапазон'},{id:'all',n:'Весь период'}]
       .forEach(opt => {
         const handler = (opt.id === 'custom')
@@ -1024,7 +982,7 @@
     }
 
     else if (state.view === 'analytics_custom') {
-      title.innerText = "Период";
+      setHeaderTitleText("Период");
       const cal = state.analyticsCal;
       const firstDay = (new Date(cal.year, cal.month, 1).getDay() || 7) - 1;
       const daysInMonth = new Date(cal.year, cal.month + 1, 0).getDate();
@@ -1057,7 +1015,7 @@
     }
 
     else if (state.view === 'analytics_view') {
-      title.innerText = "Итоги";
+      setHeaderTitleText("Итоги");
       const filtered = filterAnalytics(db.reports);
       const totalSum = filtered.reduce((a, b) => a + b.amount, 0);
 
@@ -1084,7 +1042,7 @@
     }
 
     else if (state.view === 'history') {
-      title.innerText = "История";
+      setHeaderTitleText("История");
       if (!db.reports.length) {
         container.innerHTML = `<p class="text-center opacity-30 py-10 uppercase text-[10px]">Нет данных</p>`;
       } else {
@@ -1417,7 +1375,7 @@
     },{passive:true});
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (оптимизировано для iOS) ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА ===== */
   const rootStyle=document.documentElement.style;
   let pointerX=0, pointerY=0;
   let smoothX=0, smoothY=0;
@@ -1459,39 +1417,8 @@
   window.addEventListener('touchcancel',()=>spotlightOff(),{passive:true});
 
   let _t0=performance.now();
-
-  // iOS “дорого и плавно”: фон обновляем реже, а во время скролла замораживаем
-  let _lastFrame = 0;
-  function getTargetFps(){
-    if (!isIOS) return 60;
-    // on iOS: softer background FPS
-    if (document.body.classList.contains('is-scrolling')) return 0; // freeze
-    return 40; // smooth + light
-  }
-
-  function rafParallax(now){
-    const targetFps = getTargetFps();
-    if (targetFps === 0) {
-      // keep checking for inertia end (and remove class smoothly)
-      if (isIOS) {
-        const dt = now - (__scrollLastTs || 0);
-        if (dt > 180 && document.body.classList.contains('is-scrolling')) {
-          __scrolling = false;
-          document.body.classList.remove('is-scrolling');
-        }
-      }
-      requestAnimationFrame(rafParallax);
-      return;
-    }
-
-    const minDt = 1000 / targetFps;
-    if (_lastFrame && (now - _lastFrame) < minDt) {
-      requestAnimationFrame(rafParallax);
-      return;
-    }
-    _lastFrame = now;
-
-    const t=(now-_t0)/1000;
+  function rafParallax(){
+    const t=(performance.now()-_t0)/1000;
 
     const ax = (Math.sin(t*1.18)*30 + Math.sin(t*0.48)*18 + Math.sin(t*0.20)*12);
     const ay = (Math.cos(t*1.04)*28 + Math.cos(t*0.42)*16 + Math.cos(t*0.18)*12);
@@ -1518,15 +1445,6 @@
     rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2)+'%');
     rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2)+'%');
     rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
-
-    // extra: if inertia ended but class still present, clear it
-    if (isIOS && document.body.classList.contains('is-scrolling')) {
-      const dt = now - (__scrollLastTs || 0);
-      if (dt > 180) {
-        __scrolling = false;
-        document.body.classList.remove('is-scrolling');
-      }
-    }
 
     requestAnimationFrame(rafParallax);
   }
