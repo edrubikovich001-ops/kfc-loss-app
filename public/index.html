@@ -670,6 +670,24 @@
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
+  /* ====== ДОРАБОТКА: годы до 2030 ====== */
+  const YEAR_MIN = 2024;
+  const YEAR_MAX = 2030;
+
+  function buildYearOptions(selectedYear){
+    const years = [];
+    for (let y = YEAR_MIN; y <= YEAR_MAX; y++) years.push(y);
+
+    // На случай если в данных/черновике год оказался вне диапазона — селект не ломаем.
+    if (typeof selectedYear === 'number') {
+      if (selectedYear < YEAR_MIN) years.unshift(selectedYear);
+      if (selectedYear > YEAR_MAX) years.push(selectedYear);
+    }
+
+    return Array.from(new Set(years)).sort((a,b)=>a-b);
+  }
+  /* ===================================== */
+
   const dataTU = {
     "Alyona Rainskaya": ["12741 — KFC Baizar Mall","12714 — KFC Essentai Mall","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"],
     "Andrey Nacharov": ["12736 — KFC Batyr Mall","12737 — KFC Sarayarka","12751 — KFC UST Kamenogorsk","12772 — KFC Kutuzova Pavlodar","12783 — KFC MAXI MALL EKIBASTUZ","12784 — KFC MAXI MALL OSKEMEN","12787 — KFC Koschi","12825 — KFC CENTRAL PARK SEMEY"],
@@ -952,8 +970,10 @@
             <select onchange="updateFlowDate('month', this.value)" class="ios-select">
               ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
+
+            <!-- ДОРАБОТКА: годы 2024..2030 -->
             <select onchange="updateFlowDate('year', this.value)" class="ios-select">
-              ${[2024,2025,2026].map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
+              ${buildYearOptions(cur.year).map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
             </select>
           </div>
 
