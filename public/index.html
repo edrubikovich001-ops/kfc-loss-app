@@ -563,21 +563,18 @@
     /* Wrapper height stabilization (visual 1:1) */
     .app-shell{ height: var(--appH); }
 
-    /* ===========================
-       ANDROID ONLY (добавлено)
-       Ничего не меняет для iOS.
-       =========================== */
-    body.android main{
-      /* Android WebView: плавный скролл без дерганий от "smooth" на некоторых устройствах */
-      scroll-behavior: auto;
+    /* ===========================================================
+       ANDROID PERF MODE (Android-only): убираем тяжёлый фон/overlay,
+       не трогая iOS-визуал вообще.
+       =========================================================== */
+    body.android #bg,
+    body.android #bg-lines,
+    body.android #bg-noise,
+    body.android #bg-pulse,
+    body.android #spotlight{
+      display:none !important;
     }
-    body.android .app-shell{
-      /* Android WebView иногда дергает компоновку: фиксируем отрисовку */
-      transform: translateZ(0);
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-    /* =========================== */
+    body.android main{ scroll-behavior:auto !important; }
   </style>
 </head>
 
@@ -636,22 +633,14 @@
     return iOS || iPadOS;
   })();
 
-  /* ===== ANDROID detection (добавлено; iOS не трогаем) ===== */
+  /* ===== Android detection (Android-only perf mode) ===== */
   const isAndroid = (() => {
     const ua = navigator.userAgent || "";
     return /Android/i.test(ua);
   })();
-
-  if (isAndroid) document.body.classList.add('android');
-
-  /* ===== Android perf profile (добавлено; безопасно) ===== */
-  const androidPerf = (() => {
-    if (!isAndroid) return { lowEnd: false, targetFps: 60 };
-    const mem = Number(navigator.deviceMemory || 0); // GB (может быть undefined)
-    const cores = Number(navigator.hardwareConcurrency || 0);
-    const lowEnd = (mem && mem <= 4) || (cores && cores <= 4);
-    return { lowEnd, targetFps: lowEnd ? 45 : 60 };
-  })();
+  if (isAndroid) {
+    document.body.classList.add('android');
+  }
 
   /* ===== Stable height for iOS (no jumping with bars) ===== */
   (function bindViewportHeight(){
@@ -700,53 +689,8 @@
     }, { passive:true });
   })();
 
-  /* ===== ANDROID: плавная работа в WebView (добавлено; iOS как есть) =====
-     Идея: на Android при активном скролле (включая инерцию) на доли секунды
-     подмораживаем тяжёлые эффекты через уже существующий класс is-scrolling.
-     Визуально почти не заметно, но резко снижает "фризы" на Android. */
-  (function bindAndroidScrollStability(){
-    if (!isAndroid) return;
-    const main = document.getElementById('view-container');
-    if(!main) return;
-
-    let t = null;
-    let active = false;
-
-    main.addEventListener('scroll', () => {
-      __scrollLastTs = performance.now();
-      if (!active) {
-        active = true;
-        document.body.classList.add('is-scrolling');
-      }
-      clearTimeout(t);
-      // На Android инерция обычно короче — делаем быстрее возврат эффектов.
-      t = setTimeout(() => {
-        active = false;
-        document.body.classList.remove('is-scrolling');
-      }, 160);
-    }, { passive:true });
-  })();
-
   const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
-
-  /* ====== ДОРАБОТКА: годы до 2030 ====== */
-  const YEAR_MIN = 2024;
-  const YEAR_MAX = 2030;
-
-  function buildYearOptions(selectedYear){
-    const years = [];
-    for (let y = YEAR_MIN; y <= YEAR_MAX; y++) years.push(y);
-
-    // На случай если в данных/черновике год оказался вне диапазона — селект не ломаем.
-    if (typeof selectedYear === 'number') {
-      if (selectedYear < YEAR_MIN) years.unshift(selectedYear);
-      if (selectedYear > YEAR_MAX) years.push(selectedYear);
-    }
-
-    return Array.from(new Set(years)).sort((a,b)=>a-b);
-  }
-  /* ===================================== */
 
   const dataTU = {
     "Alyona Rainskaya": ["12741 — KFC Baizar Mall","12714 — KFC Essentai Mall","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"],
@@ -1012,6 +956,11 @@
       const firstDay = (new Date(cur.year, cur.month, 1).getDay() || 7) - 1;
       const daysInMonth = new Date(cur.year, cur.month + 1, 0).getDate();
 
+      // ГОДА ДО 2030 (включительно): Android/iOS одинаково.
+      const yearFrom = 2024;
+      const yearTo = 2030;
+      const years = Array.from({length: (yearTo - yearFrom + 1)}, (_,i)=>yearFrom+i);
+
       container.innerHTML = `
         <div class="ios-card border-live lens-card p-5">
           <div class="lens-layer"></div>
@@ -1030,10 +979,8 @@
             <select onchange="updateFlowDate('month', this.value)" class="ios-select">
               ${monthNames.map((m, i) => `<option value="${i}" ${i === cur.month ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
-
-            <!-- ДОРАБОТКА: годы 2024..2030 -->
             <select onchange="updateFlowDate('year', this.value)" class="ios-select">
-              ${buildYearOptions(cur.year).map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
+              ${years.map(y => `<option value="${y}" ${y === cur.year ? 'selected' : ''}>${y}</option>`).join('')}
             </select>
           </div>
 
@@ -1497,7 +1444,7 @@
     },{passive:true});
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (оптимизировано для iOS + Android) ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (оптимизировано для iOS) ===== */
   const rootStyle=document.documentElement.style;
   let pointerX=0, pointerY=0;
   let smoothX=0, smoothY=0;
@@ -1543,23 +1490,22 @@
   // iOS “дорого и плавно”: фон обновляем реже, а во время скролла замораживаем
   let _lastFrame = 0;
   function getTargetFps(){
-    if (!isIOS && !isAndroid) return 60;
-
-    // Общее правило: во время скролла (iOS и Android) — заморозка тяжёлых фоновых обновлений
-    if (document.body.classList.contains('is-scrolling')) return 0;
-
-    if (isIOS) return 40; // как было
-    // Android: адаптивно под устройство, не меняя внешний вид.
-    return androidPerf.targetFps;
+    if (!isIOS) return 60;
+    // on iOS: softer background FPS
+    if (document.body.classList.contains('is-scrolling')) return 0; // freeze
+    return 40; // smooth + light
   }
 
   function rafParallax(now){
     const targetFps = getTargetFps();
     if (targetFps === 0) {
-      // keep checking for inertia end (и на iOS, и на Android)
-      const dt = now - (__scrollLastTs || 0);
-      if (dt > (isAndroid ? 140 : 180) && document.body.classList.contains('is-scrolling')) {
-        document.body.classList.remove('is-scrolling');
+      // keep checking for inertia end (and remove class smoothly)
+      if (isIOS) {
+        const dt = now - (__scrollLastTs || 0);
+        if (dt > 180 && document.body.classList.contains('is-scrolling')) {
+          __scrolling = false;
+          document.body.classList.remove('is-scrolling');
+        }
       }
       requestAnimationFrame(rafParallax);
       return;
@@ -1599,6 +1545,15 @@
     rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2)+'%');
     rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2)+'%');
     rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
+
+    // extra: if inertia ended but class still present, clear it
+    if (isIOS && document.body.classList.contains('is-scrolling')) {
+      const dt = now - (__scrollLastTs || 0);
+      if (dt > 180) {
+        __scrolling = false;
+        document.body.classList.remove('is-scrolling');
+      }
+    }
 
     requestAnimationFrame(rafParallax);
   }
@@ -1645,7 +1600,12 @@
     try{
       render();
       bindScrollHaptics();
-      requestAnimationFrame(rafParallax);
+
+      // ВАЖНО: Android — не запускаем тяжёлый rafParallax вообще (фон выключен CSS-ом).
+      // iOS / desktop — как было.
+      if (!isAndroid) {
+        requestAnimationFrame(rafParallax);
+      }
 
       toast("Загрузка...");
       loadReportsFromServer()
