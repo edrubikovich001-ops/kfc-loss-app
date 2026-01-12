@@ -562,6 +562,22 @@
 
     /* Wrapper height stabilization (visual 1:1) */
     .app-shell{ height: var(--appH); }
+
+    /* ===========================
+       ANDROID ONLY (добавлено)
+       Ничего не меняет для iOS.
+       =========================== */
+    body.android main{
+      /* Android WebView: плавный скролл без дерганий от "smooth" на некоторых устройствах */
+      scroll-behavior: auto;
+    }
+    body.android .app-shell{
+      /* Android WebView иногда дергает компоновку: фиксируем отрисовку */
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    /* =========================== */
   </style>
 </head>
 
@@ -620,6 +636,23 @@
     return iOS || iPadOS;
   })();
 
+  /* ===== ANDROID detection (добавлено; iOS не трогаем) ===== */
+  const isAndroid = (() => {
+    const ua = navigator.userAgent || "";
+    return /Android/i.test(ua);
+  })();
+
+  if (isAndroid) document.body.classList.add('android');
+
+  /* ===== Android perf profile (добавлено; безопасно) ===== */
+  const androidPerf = (() => {
+    if (!isAndroid) return { lowEnd: false, targetFps: 60 };
+    const mem = Number(navigator.deviceMemory || 0); // GB (может быть undefined)
+    const cores = Number(navigator.hardwareConcurrency || 0);
+    const lowEnd = (mem && mem <= 4) || (cores && cores <= 4);
+    return { lowEnd, targetFps: lowEnd ? 45 : 60 };
+  })();
+
   /* ===== Stable height for iOS (no jumping with bars) ===== */
   (function bindViewportHeight(){
     const root = document.documentElement;
@@ -664,6 +697,33 @@
         __scrolling = false;
         document.body.classList.remove('is-scrolling');
       }, 240);
+    }, { passive:true });
+  })();
+
+  /* ===== ANDROID: плавная работа в WebView (добавлено; iOS как есть) =====
+     Идея: на Android при активном скролле (включая инерцию) на доли секунды
+     подмораживаем тяжёлые эффекты через уже существующий класс is-scrolling.
+     Визуально почти не заметно, но резко снижает "фризы" на Android. */
+  (function bindAndroidScrollStability(){
+    if (!isAndroid) return;
+    const main = document.getElementById('view-container');
+    if(!main) return;
+
+    let t = null;
+    let active = false;
+
+    main.addEventListener('scroll', () => {
+      __scrollLastTs = performance.now();
+      if (!active) {
+        active = true;
+        document.body.classList.add('is-scrolling');
+      }
+      clearTimeout(t);
+      // На Android инерция обычно короче — делаем быстрее возврат эффектов.
+      t = setTimeout(() => {
+        active = false;
+        document.body.classList.remove('is-scrolling');
+      }, 160);
     }, { passive:true });
   })();
 
@@ -1437,7 +1497,7 @@
     },{passive:true});
   }
 
-  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (оптимизировано для iOS) ===== */
+  /* ===== ПАРАЛЛАКС + SPOTLIGHT + АВТОВОЛНА (оптимизировано для iOS + Android) ===== */
   const rootStyle=document.documentElement.style;
   let pointerX=0, pointerY=0;
   let smoothX=0, smoothY=0;
@@ -1483,22 +1543,23 @@
   // iOS “дорого и плавно”: фон обновляем реже, а во время скролла замораживаем
   let _lastFrame = 0;
   function getTargetFps(){
-    if (!isIOS) return 60;
-    // on iOS: softer background FPS
-    if (document.body.classList.contains('is-scrolling')) return 0; // freeze
-    return 40; // smooth + light
+    if (!isIOS && !isAndroid) return 60;
+
+    // Общее правило: во время скролла (iOS и Android) — заморозка тяжёлых фоновых обновлений
+    if (document.body.classList.contains('is-scrolling')) return 0;
+
+    if (isIOS) return 40; // как было
+    // Android: адаптивно под устройство, не меняя внешний вид.
+    return androidPerf.targetFps;
   }
 
   function rafParallax(now){
     const targetFps = getTargetFps();
     if (targetFps === 0) {
-      // keep checking for inertia end (and remove class smoothly)
-      if (isIOS) {
-        const dt = now - (__scrollLastTs || 0);
-        if (dt > 180 && document.body.classList.contains('is-scrolling')) {
-          __scrolling = false;
-          document.body.classList.remove('is-scrolling');
-        }
+      // keep checking for inertia end (и на iOS, и на Android)
+      const dt = now - (__scrollLastTs || 0);
+      if (dt > (isAndroid ? 140 : 180) && document.body.classList.contains('is-scrolling')) {
+        document.body.classList.remove('is-scrolling');
       }
       requestAnimationFrame(rafParallax);
       return;
@@ -1538,15 +1599,6 @@
     rootStyle.setProperty('--sx', (smoothSpotX*100).toFixed(2)+'%');
     rootStyle.setProperty('--sy', (smoothSpotY*100).toFixed(2)+'%');
     rootStyle.setProperty('--sop', smoothSpotOpacity.toFixed(3));
-
-    // extra: if inertia ended but class still present, clear it
-    if (isIOS && document.body.classList.contains('is-scrolling')) {
-      const dt = now - (__scrollLastTs || 0);
-      if (dt > 180) {
-        __scrolling = false;
-        document.body.classList.remove('is-scrolling');
-      }
-    }
 
     requestAnimationFrame(rafParallax);
   }
