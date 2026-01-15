@@ -1388,27 +1388,38 @@
     hapticImpact("medium");
   }
 
-  async function exportExcelServer() {
+  function forceDownload(url, filename = 'KFC_Loss_Control.xlsx') {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 120);
+}
+
+function exportExcelServer() {
   const url = `${window.location.origin}${API}/export.xlsx`;
   hapticImpact("light");
 
-  try {
-    const resp = await fetch(url, { credentials: 'include' });
-    const blob = await resp.blob();
-
-    const blobUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = 'KFC_Loss_Control.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(blobUrl);
-  } catch (e) {
-    alert('Не удалось скачать файл. Используйте "Поделиться → Сохранить в Файлы".');
-    window.open(url, '_blank');
+  // 1) Telegram WebApp
+  if (tg && typeof tg.openLink === "function") {
+    try {
+      tg.openLink(url, { try_instant_view: false });
+      return;
+    } catch (e) {}
   }
+
+  // 2) iOS fallback
+  try {
+    forceDownload(url);
+    return;
+  } catch (e) {}
+
+  // 3) last fallback
+  window.open(url, "_blank");
 }
+
 
   function splitRestaurant(r){
     const s = (r || '');
