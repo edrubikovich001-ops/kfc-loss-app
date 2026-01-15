@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import crypto from "crypto";
 import pg from "pg";
 
@@ -41,11 +42,7 @@ function parseRuDT(s) {
   if (!s || typeof s !== "string") return null;
   const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!m) return null;
-  const dd = Number(m[1]),
-    mm = Number(m[2]) - 1,
-    yy = Number(m[3]),
-    hh = Number(m[4]),
-    mi = Number(m[5]);
+  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
   const d = new Date(yy, mm, dd, hh, mi);
   if (Number.isNaN(d.getTime())) return null;
   return d;
@@ -257,75 +254,95 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel (серверный) — 1:1 как клиент (ПК)
+// export excel (серверный) — с переносом в комментариях + длительность после суммы
 app.get("/api/export.xlsx", async (req, res) => {
   try {
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const rows = (await q(`SELECT * FROM reports`)).rows || [];
+    rows.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0)); // по сумме убыв.
 
-    // Сортировка по сумме: от большего к меньшему (как на ПК)
-    rows.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "KFC Loss Control";
+    wb.created = new Date();
 
-    // Делаем данные в нужном порядке колонок (A..I)
-    const aoa = [
-      ["ID", "Менеджер", "Ресторан код", "Ресторан", "Причина", "Сумма", "Начало", "Конец", "Комментарий"]
+    const ws = wb.addWorksheet("Reports", {
+      views: [{ state: "frozen", ySplit: 1 }]
+    });
+
+    // ✅ Порядок колонок + Длительность сразу после суммы
+    const header = [
+      "ID",
+      "Менеджер",
+      "Ресторан код",
+      "Ресторан",
+      "Причина",
+      "Сумма",
+      "Длительность (ч)",
+      "Начало",
+      "Конец",
+      "Комментарий"
     ];
+    ws.addRow(header);
 
     for (const r of rows) {
       const rr = splitRestaurant(r.restaurant);
-      aoa.push([
+      ws.addRow([
         Number(r.id) || "",
         r.manager || "",
         rr.code || "",
         rr.name || "",
         r.reason || "",
         Number(r.amount) || 0,
+        hoursDiff(r.start, r.end),
         r.start || "",
         r.end || "",
         r.comment || ""
       ]);
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-    // Колонки ширины как на ПК (примерно)
-    ws["!cols"] = [
-      { wch: 10 }, // ID
-      { wch: 22 }, // Менеджер
-      { wch: 14 }, // Ресторан код
-      { wch: 28 }, // Ресторан
-      { wch: 18 }, // Причина
-      { wch: 14 }, // Сумма
-      { wch: 18 }, // Начало
-      { wch: 18 }, // Конец
-      { wch: 34 }  // Комментарий
+    // Ширины колонок
+    ws.columns = [
+      { width: 10 }, // ID
+      { width: 22 }, // Менеджер
+      { width: 14 }, // Ресторан код
+      { width: 28 }, // Ресторан
+      { width: 18 }, // Причина
+      { width: 14 }, // Сумма
+      { width: 16 }, // Длительность
+      { width: 18 }, // Начало
+      { width: 18 }, // Конец
+      { width: 34 }  // Комментарий
     ];
 
-    // Автофильтр в шапке (A1:I1)
-    ws["!autofilter"] = { ref: "A1:I1" };
+    // Фильтры
+    ws.autoFilter = { from: "A1", to: "J1" };
 
-    // Формат суммы в ₸ (колонка F = индекс 5)
-    if (ws["!ref"]) {
-      const range = XLSX.utils.decode_range(ws["!ref"]);
-      for (let R = range.s.r + 1; R <= range.e.r; R++) {
-        const addr = XLSX.utils.encode_cell({ c: 5, r: R });
-        if (ws[addr]) {
-          ws[addr].t = "n";
-          ws[addr].z = '#,##0" ₸"';
-        }
-      }
+    // Шапка
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    headerRow.height = 20;
+
+    // Форматы
+    ws.getColumn(6).numFmt = '#,##0" ₸"'; // Сумма
+    ws.getColumn(7).numFmt = '0.00';      // Длительность (ч)
+
+    // ✅ Перенос текста для всех строк (особенно Комментарий)
+    ws.getColumn(10).alignment = { vertical: "top", horizontal: "left", wrapText: true };
+
+    for (let r = 2; r <= ws.rowCount; r++) {
+      const row = ws.getRow(r);
+      row.alignment = { vertical: "top", horizontal: "left", wraplabil: null, wrapText: true };
+      row.height = 30;
     }
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reports");
-
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
     const filename = `KFC_Loss_${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(buf);
+
+    await wb.xlsx.write(res);
+    res.end();
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "unknown" });
   }
