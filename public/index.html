@@ -1502,7 +1502,7 @@ function exportExcelServer() {
       ws.autoFilter = { from: 'A1', to: 'I1' };
 
       // Формат суммы.
-      ws.getColumn(6).numFmt = '#,##0';
+      ws.getColumn(6).numFmt = '#,##0" ₸"';
 
       // Выравнивание по умолчанию.
       ws.eachRow((row, rowNumber) => {
