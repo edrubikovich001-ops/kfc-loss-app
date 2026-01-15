@@ -1449,101 +1449,117 @@ function exportExcelServer() {
       return;
     }
 
+    const filtered = filterAnalytics(db.reports);
 
-      const filtered = filterAnalytics(db.reports);
-      const rows = (filtered || []).slice().sort((a,b)=> (b.amount||0) - (a.amount||0)); // от больших потерь к меньшим.
+    // ✅ сортировка от больших потерь к меньшим (как было)
+    const rows = (filtered || []).slice().sort((a,b)=> (b.amount||0) - (a.amount||0));
 
-      const wb = new ExcelJS.Workbook();
-      wb.creator = 'KFC Loss Control';
-      wb.created = new Date();
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'KFC Loss Control';
+    wb.created = new Date();
 
-      const ws = wb.addWorksheet('Reports', {
-        views: [{ state: 'frozen', ySplit: 1 }]
-      });
+    const ws = wb.addWorksheet('Reports', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    });
 
-      const header = ["ID","Менеджер","Ресторан код","Ресторан","Причина","Сумма","Начало","Конец","Комментарий"];
-      ws.addRow(header);
+    // ✅ добавили "Длительность (ч)" сразу после "Сумма"
+    const header = ["ID","Менеджер","Ресторан код","Ресторан","Причина","Сумма","Длительность (ч)","Начало","Конец","Комментарий"];
+    ws.addRow(header);
 
-      for(const r of rows){
-        const rr = splitRestaurant(r.restaurant);
-        ws.addRow([
-          Number(r.id)||'',
-          r.manager||'',
-          rr.code||'',
-          rr.name||'',
-          r.reason||'',
-          Number(r.amount)||0,
-          fmtDateObj(r.start),
-          fmtDateObj(r.end),
-          r.comment||''
-        ]);
-      }
+    // ✅ считаем длительность по ts (без парсинга строк)
+    const calcHours = (r) => {
+      const a = Number(r?.start?.ts);
+      const b = Number(r?.end?.ts);
+      if(!Number.isFinite(a) || !Number.isFinite(b)) return "";
+      const diff = (b - a) / (1000 * 60 * 60);
+      return Math.round(diff * 100) / 100;
+    };
 
-      // Ширины.
-      ws.columns = [
-        { width: 10 }, // ID
-        { width: 22 }, // Менеджер
-        { width: 14 }, // Код
-        { width: 28 }, // Ресторан
-        { width: 18 }, // Причина
-        { width: 14 }, // Сумма
-        { width: 18 }, // Начало
-        { width: 18 }, // Конец
-        { width: 34 }  // Комментарий
-      ];
-
-      // Оформление заголовка + автофильтр (важно: фильтры сразу доступны).
-      const headerRow = ws.getRow(1);
-      headerRow.font = { bold: true };
-      headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-      headerRow.height = 20;
-
-      // Автофильтр по заголовку.
-      ws.autoFilter = { from: 'A1', to: 'I1' };
-
-      // Формат суммы.
-      ws.getColumn(6).numFmt = '#,##0" ₸"';
-
-      // Выравнивание по умолчанию.
-      ws.eachRow((row, rowNumber) => {
-        if(rowNumber === 1) return;
-        row.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-      });
-
-      const rangeLabel = (()=>{
-        if(!rows.length) return 'empty';
-        const minTs = Math.min(...rows.map(x=>Number(x.start?.ts||x.created_at||Date.now())));
-        const maxTs = Math.max(...rows.map(x=>Number(x.start?.ts||x.created_at||Date.now())));
-        const a = new Date(minTs);
-        const b = new Date(maxTs);
-        return `${pad2(a.getDate())}.${pad2(a.getMonth()+1)}_${pad2(b.getDate())}.${pad2(b.getMonth()+1)}`;
-      })();
-
-      const filename = `KFC_Loss_${rangeLabel}.xlsx`;
-      toast("Готовлю Excel...");
-
-      const buf = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-
-      // Надёжная загрузка (и в TG WebView, и в браузере).
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.style.display='none';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      setTimeout(()=>URL.revokeObjectURL(url), 8000);
-
-      toast("Excel готов.");
-      hapticImpact("light");
-    }catch(e){
-      toast("Ошибка Excel.");
-      exportExcelServer();
+    for(const r of rows){
+      const rr = splitRestaurant(r.restaurant);
+      ws.addRow([
+        Number(r.id)||'',
+        r.manager||'',
+        rr.code||'',
+        rr.name||'',
+        r.reason||'',
+        Number(r.amount)||0,
+        calcHours(r),
+        fmtDateObj(r.start),
+        fmtDateObj(r.end),
+        r.comment||''
+      ]);
     }
+
+    // ✅ Ширины (добавили колонку длительности)
+    ws.columns = [
+      { width: 10 }, // ID
+      { width: 22 }, // Менеджер
+      { width: 14 }, // Код
+      { width: 28 }, // Ресторан
+      { width: 18 }, // Причина
+      { width: 14 }, // Сумма
+      { width: 16 }, // Длительность
+      { width: 18 }, // Начало
+      { width: 18 }, // Конец
+      { width: 34 }  // Комментарий
+    ];
+
+    // ✅ Фильтры в шапке (теперь до J)
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    headerRow.height = 20;
+
+    ws.autoFilter = { from: 'A1', to: 'J1' };
+
+    // ✅ Форматы: сумма тенге + длительность 2 знака
+    ws.getColumn(6).numFmt = '#,##0" ₸"';
+    ws.getColumn(7).numFmt = '0.00';
+
+    // ✅ перенос текста для комментариев (колонка теперь 10)
+    ws.getColumn(10).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+
+    // Выравнивание по умолчанию.
+    ws.eachRow((row, rowNumber) => {
+      if(rowNumber === 1) return;
+      row.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+    });
+
+    const rangeLabel = (()=> {
+      if(!rows.length) return 'empty';
+      const minTs = Math.min(...rows.map(x=>Number(x.start?.ts||x.created_at||Date.now())));
+      const maxTs = Math.max(...rows.map(x=>Number(x.start?.ts||x.created_at||Date.now())));
+      const a = new Date(minTs);
+      const b = new Date(maxTs);
+      return `${pad2(a.getDate())}.${pad2(a.getMonth()+1)}_${pad2(b.getDate())}.${pad2(b.getMonth()+1)}`;
+    })();
+
+    const filename = `KFC_Loss_${rangeLabel}.xlsx`;
+    toast("Готовлю Excel...");
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+
+    // Надёжная загрузка (и в TG WebView, и в браузере).
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(()=>URL.revokeObjectURL(url), 8000);
+
+    toast("Excel готов.");
+    hapticImpact("light");
+  }catch(e){
+    toast("Ошибка Excel.");
+    exportExcelServer();
   }
+}
 
   async function saveReport() {
     const val = parseInt(document.getElementById('sum-input')?.value || "0") || 0;
