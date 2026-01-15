@@ -1389,11 +1389,21 @@
   }
 
   function exportExcelServer() {
-    const url = `${window.location.origin}${API}/export.xlsx`;
-    hapticImpact("light");
-    if (tg && typeof tg.openLink === "function") { tg.openLink(url); return; }
-    window.location.href = url;
+  const url = `${window.location.origin}${API}/export.xlsx`;
+  hapticImpact("light");
+
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    window.open(url, '_blank');
   }
+}
 
   function splitRestaurant(r){
     const s = (r || '');
