@@ -1436,12 +1436,19 @@ function exportExcelServer() {
   }
 
   async function exportExcel(){
-    try{
-      // Если ExcelJS недоступен, падаем на серверный экспорт.
-      if(typeof ExcelJS === "undefined" || !ExcelJS?.Workbook){
-        exportExcelServer();
-        return;
-      }
+  try{
+    // iOS Telegram НЕ скачивает Blob — только серверный файл
+    if (tg && isIOS) {
+      exportExcelServer();
+      return;
+    }
+
+    // Если ExcelJS недоступен, падаем на серверный экспорт.
+    if(typeof ExcelJS === "undefined" || !ExcelJS?.Workbook){
+      exportExcelServer();
+      return;
+    }
+
 
       const filtered = filterAnalytics(db.reports);
       const rows = (filtered || []).slice().sort((a,b)=> (b.amount||0) - (a.amount||0)); // от больших потерь к меньшим.
