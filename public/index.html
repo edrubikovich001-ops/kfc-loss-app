@@ -1388,19 +1388,24 @@
     hapticImpact("medium");
   }
 
-  function exportExcelServer() {
+  async function exportExcelServer() {
   const url = `${window.location.origin}${API}/export.xlsx`;
   hapticImpact("light");
 
   try {
+    const resp = await fetch(url, { credentials: 'include' });
+    const blob = await resp.blob();
+
+    const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
+    a.href = blobUrl;
+    a.download = 'KFC_Loss_Control.xlsx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
   } catch (e) {
+    alert('Не удалось скачать файл. Используйте "Поделиться → Сохранить в Файлы".');
     window.open(url, '_blank');
   }
 }
