@@ -8,6 +8,8 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Excel (клиентская генерация с автофильтром/сортировкой). -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
@@ -601,9 +603,16 @@
         </div>
       </div>
 
-      <button onclick="refreshFromServer()" class="text-gray-200/70 transition-transform btn-liquid w-10 h-10 rounded-full flex items-center justify-center relative z-10" title="Обновить">
-        <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
-      </button>
+      <div class="flex items-center gap-2 relative z-10">
+        <!-- Android: явная кнопка "Добавить на экран" (Telegram Mini Apps API). -->
+        <button id="a2hs-btn" onclick="addToHomeScreen()" class="hidden text-gray-200/70 transition-transform btn-liquid w-10 h-10 rounded-full flex items-center justify-center" title="Добавить на экран">
+          <i data-lucide="smartphone" class="w-5 h-5"></i>
+        </button>
+
+        <button onclick="refreshFromServer()" class="text-gray-200/70 transition-transform btn-liquid w-10 h-10 rounded-full flex items-center justify-center" title="Обновить">
+          <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
+        </button>
+      </div>
     </header>
 
     <main id="view-container" class="flex-1 overflow-y-auto px-6 py-6 pb-48"></main>
@@ -733,6 +742,16 @@
       start:startObj, end:endObj, created_at:Number(r.created_at)||startObj.ts };
   }
 
+  function dedupeReportsById(reports){
+    const m=new Map();
+    for(const r of (reports||[])){
+      if(!r || typeof r.id!=="number") continue;
+      const prev=m.get(r.id);
+      if(!prev || (Number(r.created_at||0) > Number(prev.created_at||0))) m.set(r.id, r);
+    }
+    return Array.from(m.values());
+  }
+
   function toast(msg){
     const el=document.getElementById('toast'); if(!el) return;
     el.textContent=msg; el.classList.add('show');
@@ -758,7 +777,8 @@
 
   async function loadReportsFromServer(){
     const data=await apiJson(`${API}/reports`,{method:"GET"},12000);
-    db.reports=(data.reports||[]).map(normalizeServerReport);
+    const normalized=(data.reports||[]).map(normalizeServerReport);
+    db.reports=dedupeReportsById(normalized);
   }
 
   function safePopup(title,message){
@@ -780,7 +800,9 @@
     start:null, end:null, stage:'start', amount:0,
     filter:'all', analyticsCal:{ month:new Date().getMonth(), year:new Date().getFullYear(), start:null, end:null },
     analyticsTab:'restaurants', draftId:null, editId:null,
-    searchManager:'', searchRestaurant:''
+    searchManager:'', searchRestaurant:'',
+    homeScreenStatus: null,
+    clientRequestId: null
   };
   let historyStack=['main'];
 
@@ -790,9 +812,16 @@
     const primaryBtn=document.getElementById('primary-btn');
     if(showFooter) footer.classList.remove('hidden'); else footer.classList.add('hidden');
     if(showLater) laterBtn.classList.remove('hidden'); else laterBtn.classList.add('hidden');
-    primaryBtn.disabled=false; primaryBtn.classList.remove('opacity-40');
+
+    primaryBtn.disabled=false;
+    primaryBtn.classList.remove('opacity-40');
     primaryBtn.innerText=label;
-    primaryBtn.onclick=()=>{ hapticImpact("light"); handler(); };
+
+    primaryBtn.onclick=()=>{
+      if(primaryBtn.disabled) return;
+      hapticImpact("light");
+      handler();
+    };
   }
 
   let renderScheduled=false;
@@ -822,6 +851,102 @@
     if(_iconsScheduled) return;
     _iconsScheduled=true;
     requestAnimationFrame(()=>{ _iconsScheduled=false; try{ lucide.createIcons(); }catch(_){ } });
+  }
+
+  /* ===== Android: Add to Home Screen (Telegram API) ===== */
+  function supportsHomeScreen(){
+    return !!(tg && isAndroid && typeof tg.addToHomeScreen === "function" && typeof tg.checkHomeScreenStatus === "function");
+  }
+
+  function updateA2HSButton(){
+    const btn=document.getElementById('a2hs-btn');
+    if(!btn) return;
+
+    if(!supportsHomeScreen()){
+      btn.classList.add('hidden');
+      return;
+    }
+
+    // Показываем кнопку, если не "added".
+    const st = state.homeScreenStatus;
+    if(st === 'added'){
+      btn.classList.add('hidden');
+    } else {
+      btn.classList.remove('hidden');
+    }
+  }
+
+  function bindHomeScreenStatus(){
+    if(!supportsHomeScreen()) return;
+
+    try{
+      tg.checkHomeScreenStatus((status)=>{
+        state.homeScreenStatus = status || null;
+        updateA2HSButton();
+        scheduleIcons();
+      });
+    }catch(_){}
+
+    try{
+      tg.onEvent?.('homeScreenAdded', ()=>{
+        state.homeScreenStatus = 'added';
+        toast("Ярлык добавлен.");
+        updateA2HSButton();
+      });
+    }catch(_){}
+  }
+
+  function addToHomeScreen(){
+    if(!supportsHomeScreen()){
+      toast("Не поддерживается.");
+      return;
+    }
+
+    // Варианты статуса: unsupported / unknown / added / missed.
+    const st = state.homeScreenStatus;
+    if(st === 'unsupported'){
+      toast("Не поддерживается.");
+      return;
+    }
+    if(st === 'added'){
+      toast("Уже добавлено.");
+      return;
+    }
+
+    try{
+      tg.addToHomeScreen();
+      toast("Открываю добавление…");
+    }catch(e){
+      toast("Ошибка.");
+    }
+  }
+
+  /* ===== Anti-duplicate submit ===== */
+  let __saveInFlight = false;
+  let __lastSaveSig = null;
+  let __lastSaveAt = 0;
+
+  function makeSaveSignature(payload){
+    try{
+      return [
+        payload.manager,
+        payload.restaurant,
+        payload.reason,
+        String(payload.amount||0),
+        payload.start,
+        payload.end,
+        (payload.comment||'')
+      ].join('|');
+    }catch(_){
+      return String(Date.now());
+    }
+  }
+
+  function lockPrimaryButton(locked){
+    const primaryBtn=document.getElementById('primary-btn');
+    if(!primaryBtn) return;
+    primaryBtn.disabled=!!locked;
+    primaryBtn.classList.toggle('opacity-40', !!locked);
   }
 
   function render(){
@@ -965,9 +1090,16 @@
         <div class="ios-card border-live lens-card p-5">
           <div class="lens-layer"></div>
           ${!isStart ? `
-          <div class="mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-            <p class="text-[8px] uppercase font-black text-blue-300 mb-1 tracking-widest">Начало</p>
-            <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${pad2(state.start.hour)}:${pad2(state.start.min)}</p>
+          <div class="mb-3 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-[8px] uppercase font-black text-blue-300 mb-1 tracking-widest">Начало</p>
+                <p class="text-xs font-bold">${state.start.day} ${monthNamesGenitive[state.start.month]} ${pad2(state.start.hour)}:${pad2(state.start.min)}</p>
+              </div>
+              <button onclick="editStartTime()" class="shrink-0 px-3 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest bg-white/10 btn-liquid">
+                Изменить начало
+              </button>
+            </div>
           </div>` : ''}
 
           <div class="flex justify-between items-center mb-6">
@@ -1001,7 +1133,14 @@
           state.start.hour=v.h; state.start.min=v.m;
           state.start.ts = new Date(state.start.year, state.start.month, state.start.day, state.start.hour, state.start.min).getTime();
           state.stage='end';
-          state.end=JSON.parse(JSON.stringify(state.start));
+          // Если конец ещё не задан, стартуем с начала.
+          if(!state.end) state.end=JSON.parse(JSON.stringify(state.start));
+          else state.end=JSON.parse(JSON.stringify(state.end));
+          // Подстрахуем, чтобы конец не отставал от начала при первом заходе.
+          state.end.year=state.start.year; state.end.month=state.start.month; state.end.day=state.start.day;
+          if(typeof state.end.hour!=="number") state.end.hour=state.start.hour;
+          if(typeof state.end.min!=="number") state.end.min=state.start.min;
+          state.end.ts = new Date(state.end.year, state.end.month, state.end.day, state.end.hour, state.end.min).getTime();
           render();
         } else {
           state.end.hour=v.h; state.end.min=v.m;
@@ -1016,11 +1155,18 @@
       container.innerHTML = `
         <div class="ios-card border-live lens-card p-4 mb-4 border-l-4 border-blue-500">
           <div class="lens-layer"></div>
-          <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Период</p>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold">${pad2(state.start.day)}.${pad2(state.start.month+1)} ${pad2(state.start.hour)}:${pad2(state.start.min)}</span>
-            <i data-lucide="arrow-right" class="w-3 h-3 text-gray-200/60"></i>
-            <span class="text-xs font-bold">${pad2(state.end.day)}.${pad2(state.end.month+1)} ${pad2(state.end.hour)}:${pad2(state.end.min)}</span>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Период</p>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold">${pad2(state.start.day)}.${pad2(state.start.month+1)} ${pad2(state.start.hour)}:${pad2(state.start.min)}</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 text-gray-200/60"></i>
+                <span class="text-xs font-bold">${pad2(state.end.day)}.${pad2(state.end.month+1)} ${pad2(state.end.hour)}:${pad2(state.end.min)}</span>
+              </div>
+            </div>
+            <button onclick="editStartTime(true)" class="shrink-0 px-3 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest bg-white/10 btn-liquid">
+              Изменить время
+            </button>
           </div>
         </div>
 
@@ -1094,7 +1240,7 @@
           <p class="text-[10px] text-gray-200/60 font-black uppercase mb-1 tracking-widest">Общие потери</p>
           <h2 class="text-4xl font-black">${totalSum.toLocaleString()} ₸</h2>
 
-          <button onclick="exportExcelServer()" class="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[10px] uppercase btn-liquid btn-excel">
+          <button onclick="exportExcel()" class="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[10px] uppercase btn-liquid btn-excel">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Скачать Excel
           </button>
         </div>
@@ -1147,6 +1293,7 @@
     scheduleIcons();
     attachLensHandlers();
     bindScrollHaptics();
+    updateA2HSButton();
   }
 
   function renderRestList(reports, total) {
@@ -1211,15 +1358,27 @@
 
   function resumeDraft(id) {
     const d = db.drafts.find(it => it.draftId === id);
-    if (d) {
-      state = JSON.parse(JSON.stringify(d));
-      state.view='calendar';
-      state.stage='end';
-      if (!state.end) state.end = JSON.parse(JSON.stringify(state.start));
-      historyStack=['main','calendar'];
-      render();
-      hapticImpact("light");
-    }
+    if (!d) return;
+
+    // Возвращаемся ровно в то место, где был пользователь (а не принудительно в calendar/end).
+    state = JSON.parse(JSON.stringify(d));
+
+    // Подстраховка: обязательные поля.
+    if(!state.start) state.start=getNowObj();
+    if(!state.end) state.end=JSON.parse(JSON.stringify(state.start));
+    if(!state.stage) state.stage='start';
+    if(!state.view || state.view==='main') state.view='managers';
+    if(!state.analyticsCal) state.analyticsCal={ month:new Date().getMonth(), year:new Date().getFullYear(), start:null, end:null };
+    if(!state.analyticsTab) state.analyticsTab='restaurants';
+    if(!state.searchManager) state.searchManager='';
+    if(!state.searchRestaurant) state.searchRestaurant='';
+    if(!state.draftId) state.draftId=id;
+
+    // История: минимум (назад в main работает корректно).
+    historyStack = ['main', state.view];
+
+    render();
+    hapticImpact("light");
   }
 
   function deleteDraft(id) {
@@ -1236,9 +1395,129 @@
     window.location.href = url;
   }
 
+  function splitRestaurant(r){
+    const s = (r || '');
+    if(s.includes(' — ')){
+      const parts = s.split(' — ');
+      return { code: parts[0] || '', name: parts.slice(1).join(' — ') || '' };
+    }
+    return { code:'', name:s };
+  }
+
+  function fmtDateObj(o){
+    if(!o) return '';
+    return `${pad2(o.day)}.${pad2(o.month+1)}.${o.year} ${pad2(o.hour)}:${pad2(o.min)}`;
+  }
+
+  async function exportExcel(){
+    try{
+      // Если ExcelJS недоступен, падаем на серверный экспорт.
+      if(typeof ExcelJS === "undefined" || !ExcelJS?.Workbook){
+        exportExcelServer();
+        return;
+      }
+
+      const filtered = filterAnalytics(db.reports);
+      const rows = (filtered || []).slice().sort((a,b)=> (b.amount||0) - (a.amount||0)); // от больших потерь к меньшим.
+
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'KFC Loss Control';
+      wb.created = new Date();
+
+      const ws = wb.addWorksheet('Reports', {
+        views: [{ state: 'frozen', ySplit: 1 }]
+      });
+
+      const header = ["ID","Менеджер","Ресторан код","Ресторан","Причина","Сумма","Начало","Конец","Комментарий"];
+      ws.addRow(header);
+
+      for(const r of rows){
+        const rr = splitRestaurant(r.restaurant);
+        ws.addRow([
+          Number(r.id)||'',
+          r.manager||'',
+          rr.code||'',
+          rr.name||'',
+          r.reason||'',
+          Number(r.amount)||0,
+          fmtDateObj(r.start),
+          fmtDateObj(r.end),
+          r.comment||''
+        ]);
+      }
+
+      // Ширины.
+      ws.columns = [
+        { width: 10 }, // ID
+        { width: 22 }, // Менеджер
+        { width: 14 }, // Код
+        { width: 28 }, // Ресторан
+        { width: 18 }, // Причина
+        { width: 14 }, // Сумма
+        { width: 18 }, // Начало
+        { width: 18 }, // Конец
+        { width: 34 }  // Комментарий
+      ];
+
+      // Оформление заголовка + автофильтр (важно: фильтры сразу доступны).
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      headerRow.height = 20;
+
+      // Автофильтр по заголовку.
+      ws.autoFilter = { from: 'A1', to: 'I1' };
+
+      // Формат суммы.
+      ws.getColumn(6).numFmt = '#,##0';
+
+      // Выравнивание по умолчанию.
+      ws.eachRow((row, rowNumber) => {
+        if(rowNumber === 1) return;
+        row.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+      });
+
+      const rangeLabel = (()=>{
+        if(!rows.length) return 'empty';
+        const minTs = Math.min(...rows.map(x=>Number(x.start?.ts||x.created_at||Date.now())));
+        const maxTs = Math.max(...rows.map(x=>Number(x.start?.ts||x.created_at||Date.now())));
+        const a = new Date(minTs);
+        const b = new Date(maxTs);
+        return `${pad2(a.getDate())}.${pad2(a.getMonth()+1)}_${pad2(b.getDate())}.${pad2(b.getMonth()+1)}`;
+      })();
+
+      const filename = `KFC_Loss_${rangeLabel}.xlsx`;
+      toast("Готовлю Excel...");
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+
+      // Надёжная загрузка (и в TG WebView, и в браузере).
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setTimeout(()=>URL.revokeObjectURL(url), 8000);
+
+      toast("Excel готов.");
+      hapticImpact("light");
+    }catch(e){
+      toast("Ошибка Excel.");
+      exportExcelServer();
+    }
+  }
+
   async function saveReport() {
     const val = parseInt(document.getElementById('sum-input')?.value || "0") || 0;
     if (val <= 0) return;
+
+    // Защита от двойного клика/двойной отправки.
+    if(__saveInFlight) return;
 
     state.amount = val;
 
@@ -1255,12 +1534,32 @@
       comment: state.comment || '-'
     };
 
+    const sig = makeSaveSignature(payload);
+    const now = Date.now();
+    // Если пришёл второй такой же сабмит в течение 8 секунд — игнорируем.
+    if(__lastSaveSig === sig && (now - __lastSaveAt) < 8000) return;
+
+    __saveInFlight = true;
+    __lastSaveSig = sig;
+    __lastSaveAt = now;
+
+    // Idempotency key (если бэкенд поддержит — полностью уберёт дубли).
+    if(!state.clientRequestId){
+      state.clientRequestId = 'req_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+    }
+
     toast("Сохраняю...");
+    lockPrimaryButton(true);
+
     try {
       const isEdit = !!state.editId;
+
       await apiJson(isEdit ? `${API}/reports/${state.editId}` : `${API}/reports`, {
         method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": state.clientRequestId
+        },
         body: JSON.stringify(payload)
       }, 15000);
 
@@ -1272,13 +1571,34 @@
       }
 
       state.view='main'; historyStack=['main']; state.editId=null;
+      state.clientRequestId = null;
       render();
       toast("Готово");
       hapticImpact("medium");
     } catch (e) {
       toast("Ошибка");
       alert(`Ошибка: ${e?.message || 'unknown'}`);
+    } finally {
+      __saveInFlight = false;
+      lockPrimaryButton(false);
     }
+  }
+
+  function editStartTime(fromSum=false){
+    // Возвращаем в календарь на редактирование начала (важно для "закрыть позже" + продолжить).
+    state.stage = 'start';
+    if(!state.start) state.start=getNowObj();
+    if(!state.end) state.end=JSON.parse(JSON.stringify(state.start));
+    if(fromSum){
+      // sum -> calendar: добавим корректную историю.
+      historyStack = ['main','calendar'];
+      state.view='calendar';
+      render();
+      hapticSelect();
+      return;
+    }
+    render();
+    hapticSelect();
   }
 
   function editReport(id) {
@@ -1301,7 +1621,9 @@
       draftId: null,
       editId: id,
       searchManager: state.searchManager || '',
-      searchRestaurant: state.searchRestaurant || ''
+      searchRestaurant: state.searchRestaurant || '',
+      homeScreenStatus: state.homeScreenStatus || null,
+      clientRequestId: null
     };
 
     historyStack = ['main','history','comment'];
@@ -1338,7 +1660,9 @@
       draftId: null,
       editId: null,
       searchManager: state.searchManager || '',
-      searchRestaurant: ''
+      searchRestaurant: '',
+      homeScreenStatus: state.homeScreenStatus || null,
+      clientRequestId: null
     };
     navigate('managers');
   }
@@ -1391,7 +1715,7 @@
   function filterAnalytics(reports){
     const now=new Date();
     const startOfToday=new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    return reports.filter(r => {
+    return (reports||[]).filter(r => {
       const ts = r.start?.ts || r.created_at || 0;
       if(state.filter==='today') return ts >= startOfToday;
       if(state.filter==='week') {
@@ -1601,11 +1925,14 @@
       render();
       bindScrollHaptics();
 
-      // ВАЖНО: Android — не запускаем тяжёлый rafParallax вообще (фон выключен CSS-ом).
+      // Android — не запускаем тяжёлый rafParallax вообще (фон выключен CSS-ом).
       // iOS / desktop — как было.
       if (!isAndroid) {
         requestAnimationFrame(rafParallax);
       }
+
+      // Android: статус "ярлык на экран" (Telegram API).
+      bindHomeScreenStatus();
 
       toast("Загрузка...");
       loadReportsFromServer()
