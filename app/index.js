@@ -41,7 +41,11 @@ function parseRuDT(s) {
   if (!s || typeof s !== "string") return null;
   const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!m) return null;
-  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
+  const dd = Number(m[1]),
+    mm = Number(m[2]) - 1,
+    yy = Number(m[3]),
+    hh = Number(m[4]),
+    mi = Number(m[5]);
   const d = new Date(yy, mm, dd, hh, mi);
   if (Number.isNaN(d.getTime())) return null;
   return d;
@@ -53,6 +57,15 @@ function hoursDiff(startStr, endStr) {
   if (!a || !b) return "";
   const diff = (b.getTime() - a.getTime()) / (1000 * 60 * 60);
   return Math.round(diff * 100) / 100; // 2 знака
+}
+
+function splitRestaurant(r) {
+  const s = (r || "").trim();
+  if (s.includes(" — ")) {
+    const parts = s.split(" — ");
+    return { code: (parts[0] || "").trim(), name: parts.slice(1).join(" — ").trim() };
+  }
+  return { code: "", name: s };
 }
 
 async function ensureSchema() {
@@ -244,52 +257,68 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel (серверный) — с нужными колонками
+// export excel (серверный) — 1:1 как клиент (ПК)
 app.get("/api/export.xlsx", async (req, res) => {
   try {
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
-    const rows = (await q(`SELECT * FROM reports ORDER BY created_at DESC`)).rows;
+    const rows = (await q(`SELECT * FROM reports`)).rows || [];
 
-    const data = rows.map((r) => ({
-      "ТУ": r.manager,
-      "Ресторан": r.restaurant,
-      "Причина": r.reason,
-      "Комментарий": r.comment || "",
-      "Начало инцидента": r.start || "",
-      "Конец инцидента": r.end || "",
-      "Длительность (ч)": hoursDiff(r.start, r.end),
-      "Сумма потерь (₸)": Number(r.amount) || 0
-    }));
+    // Сортировка по сумме: от большего к меньшему (как на ПК)
+    rows.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    // Делаем данные в нужном порядке колонок (A..I)
+    const aoa = [
+      ["ID", "Менеджер", "Ресторан код", "Ресторан", "Причина", "Сумма", "Начало", "Конец", "Комментарий"]
+    ];
 
-    // Формат суммы в ₸: последняя колонка (индекс 7)
+    for (const r of rows) {
+      const rr = splitRestaurant(r.restaurant);
+      aoa.push([
+        Number(r.id) || "",
+        r.manager || "",
+        rr.code || "",
+        rr.name || "",
+        r.reason || "",
+        Number(r.amount) || 0,
+        r.start || "",
+        r.end || "",
+        r.comment || ""
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Колонки ширины как на ПК (примерно)
+    ws["!cols"] = [
+      { wch: 10 }, // ID
+      { wch: 22 }, // Менеджер
+      { wch: 14 }, // Ресторан код
+      { wch: 28 }, // Ресторан
+      { wch: 18 }, // Причина
+      { wch: 14 }, // Сумма
+      { wch: 18 }, // Начало
+      { wch: 18 }, // Конец
+      { wch: 34 }  // Комментарий
+    ];
+
+    // Автофильтр в шапке (A1:I1)
+    ws["!autofilter"] = { ref: "A1:I1" };
+
+    // Формат суммы в ₸ (колонка F = индекс 5)
     if (ws["!ref"]) {
       const range = XLSX.utils.decode_range(ws["!ref"]);
       for (let R = range.s.r + 1; R <= range.e.r; R++) {
-        const cell = XLSX.utils.encode_cell({ c: 7, r: R });
-        if (ws[cell]) {
-          ws[cell].t = "n";
-          ws[cell].z = '#,##0 "₸"';
+        const addr = XLSX.utils.encode_cell({ c: 5, r: R });
+        if (ws[addr]) {
+          ws[addr].t = "n";
+          ws[addr].z = '#,##0" ₸"';
         }
       }
     }
 
-    // Ширины колонок
-    ws["!cols"] = [
-      { wch: 22 }, // ТУ
-      { wch: 34 }, // Ресторан
-      { wch: 24 }, // Причина
-      { wch: 44 }, // Комментарий
-      { wch: 20 }, // Начало
-      { wch: 20 }, // Конец
-      { wch: 14 }, // Длительность
-      { wch: 18 }  // Сумма
-    ];
-
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Loss");
+    XLSX.utils.book_append_sheet(wb, ws, "Reports");
 
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
