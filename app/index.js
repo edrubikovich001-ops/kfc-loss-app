@@ -20,31 +20,55 @@ app.use(express.static(publicDir));
 
 /**
  * ENV
- * DATABASE_URL  - строка подключения Supabase Postgres (лучше pooled)
+ * DATABASE_URL  - строка подключения Supabase Postgres (pooled или direct)
  * BOT_TOKEN     - телеграм бот токен (опционально)
  * TG_CHAT_ID    - chat_id куда слать (опционально)
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 
+// --- helpers ---
+function safeErr(e) {
+  // максимум инфы в логи/health
+  return {
+    message: e?.message || String(e),
+    code: e?.code || null,
+    detail: e?.detail || null,
+    hint: e?.hint || null,
+    where: e?.where || null,
+    stack: e?.stack ? String(e.stack).slice(0, 1200) : null
+  };
+}
+
+function withSslModeRequire(url) {
+  // Supabase pooler/direct иногда ожидают sslmode=require.
+  if (!url) return url;
+  if (url.includes("sslmode=")) return url;
+  return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
+}
+
 const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  connectionString: withSslModeRequire(DATABASE_URL),
+  ssl: { rejectUnauthorized: false },
+  // делаем стабильнее на Render
+  keepAlive: true,
+  connectionTimeoutMillis: 12000,
+  idleTimeoutMillis: 30000,
+  max: 5
 });
 
-// --- helpers ---
 async function q(text, params) {
-  const r = await pool.query(text, params);
-  return r;
+  return await pool.query(text, params);
 }
 
 function parseRuDT(s) {
-  // "07.01.2026 10:00"
   if (!s || typeof s !== "string") return null;
   const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!m) return null;
-  const dd = Number(m[1]), mm = Number(m[2]) - 1, yy = Number(m[3]), hh = Number(m[4]), mi = Number(m[5]);
+  const dd = Number(m[1]),
+    mm = Number(m[2]) - 1,
+    yy = Number(m[3]),
+    hh = Number(m[4]),
+    mi = Number(m[5]);
   const d = new Date(yy, mm, dd, hh, mi);
   if (Number.isNaN(d.getTime())) return null;
   return d;
@@ -55,7 +79,7 @@ function hoursDiff(startStr, endStr) {
   const b = parseRuDT(endStr);
   if (!a || !b) return "";
   const diff = (b.getTime() - a.getTime()) / (1000 * 60 * 60);
-  return Math.round(diff * 100) / 100; // 2 знака
+  return Math.round(diff * 100) / 100;
 }
 
 function splitRestaurant(r) {
@@ -86,32 +110,55 @@ async function ensureSchema() {
 
 let dbReady = false;
 let dbError = "";
+let dbErrorFull = null;
+
 async function initDb() {
   try {
     if (!DATABASE_URL) {
       dbReady = false;
       dbError = "DATABASE_URL is missing";
+      dbErrorFull = { message: "DATABASE_URL is missing" };
       return;
     }
+
+    // 1) проверим, что коннект вообще живой
+    await q("SELECT 1 as ok");
+
+    // 2) создадим таблицу при необходимости
     await ensureSchema();
+
     dbReady = true;
     dbError = "";
+    dbErrorFull = null;
   } catch (e) {
     dbReady = false;
-    dbError = e?.message || "db init failed";
-    console.error("DB init failed:", dbError);
+    const info = safeErr(e);
+    dbError = info.message || "db init failed";
+    dbErrorFull = info;
+    console.error("DB init failed:", info);
   }
 }
+
+// важное: не блокируем запуск сервера навсегда, но сразу пробуем поднять БД
 await initDb();
 
-// health
+// health (расширено)
 app.get("/api/health", async (req, res) => {
   try {
-    if (!dbReady) return res.json({ ok: false, dbReady: false, error: dbError || "db not ready" });
+    if (!dbReady) {
+      return res.json({
+        ok: false,
+        dbReady: false,
+        error: dbError || "db not ready",
+        error_full: dbErrorFull,
+        hasDatabaseUrl: !!DATABASE_URL
+      });
+    }
     await q("SELECT 1 as ok");
     res.json({ ok: true, dbReady: true, error: "" });
   } catch (e) {
-    res.status(500).json({ ok: false, dbReady: false, error: e?.message || "db error" });
+    const info = safeErr(e);
+    res.status(500).json({ ok: false, dbReady: false, error: info.message || "db error", error_full: info });
   }
 });
 
@@ -256,13 +303,13 @@ app.delete("/api/reports/:id", async (req, res) => {
   }
 });
 
-// export excel (серверный) — с переносом в комментариях + длительность после суммы
+// export excel (серверный) — перенос в комментариях + длительность после суммы
 app.get("/api/export.xlsx", async (req, res) => {
   try {
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const rows = (await q(`SELECT * FROM reports`)).rows || [];
-    rows.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0)); // по сумме убыв.
+    rows.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "KFC Loss Control";
@@ -272,7 +319,6 @@ app.get("/api/export.xlsx", async (req, res) => {
       views: [{ state: "frozen", ySplit: 1 }]
     });
 
-    // ✅ Порядок колонок + Длительность сразу после суммы
     const header = [
       "ID",
       "Менеджер",
@@ -303,39 +349,34 @@ app.get("/api/export.xlsx", async (req, res) => {
       ]);
     }
 
-    // Ширины колонок
     ws.columns = [
-      { width: 10 }, // ID
-      { width: 22 }, // Менеджер
-      { width: 14 }, // Ресторан код
-      { width: 28 }, // Ресторан
-      { width: 18 }, // Причина
-      { width: 14 }, // Сумма
-      { width: 16 }, // Длительность
-      { width: 18 }, // Начало
-      { width: 18 }, // Конец
-      { width: 34 }  // Комментарий
+      { width: 10 },
+      { width: 22 },
+      { width: 14 },
+      { width: 28 },
+      { width: 18 },
+      { width: 14 },
+      { width: 16 },
+      { width: 18 },
+      { width: 18 },
+      { width: 34 }
     ];
 
-    // Фильтры
     ws.autoFilter = { from: "A1", to: "J1" };
 
-    // Шапка
     const headerRow = ws.getRow(1);
     headerRow.font = { bold: true };
     headerRow.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
     headerRow.height = 20;
 
-    // Форматы
-    ws.getColumn(6).numFmt = '#,##0" ₸"'; // Сумма
-    ws.getColumn(7).numFmt = '0.00';      // Длительность (ч)
+    ws.getColumn(6).numFmt = '#,##0" ₸"';
+    ws.getColumn(7).numFmt = "0.00";
 
-    // ✅ Перенос текста для всех строк (особенно Комментарий)
+    // wrap для комментариев и для всех строк
     ws.getColumn(10).alignment = { vertical: "top", horizontal: "left", wrapText: true };
-
     for (let r = 2; r <= ws.rowCount; r++) {
       const row = ws.getRow(r);
-      row.alignment = { vertical: "top", horizontal: "left", wraplabil: null, wrapText: true };
+      row.alignment = { vertical: "top", horizontal: "left", wrapText: true };
       row.height = 30;
     }
 
