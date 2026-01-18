@@ -193,7 +193,7 @@ async function ensureDbReady() {
  */
 app.get("/api/netcheck", async (req, res) => {
   const host = "aws-1-ap-south-1.pooler.supabase.com";
-  const port = 5432;
+  const port = 6543;
 
   try {
     const out = {};
