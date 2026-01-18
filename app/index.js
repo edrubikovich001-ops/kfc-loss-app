@@ -40,38 +40,48 @@ function safeErr(e) {
   };
 }
 
-function withSslModeRequire(url) {
-  // можно оставить — не мешает, но для Render Postgres не обязателен
-  if (!url) return url;
-  if (url.includes("sslmode=")) return url;
-  return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
+function isSupabaseUrl(url) {
+  if (!url) return false;
+  return url.includes(".supabase.com");
 }
 
 function isRenderPostgresUrl(url) {
   if (!url) return false;
-  // типичные признаки Render Postgres internal/external
-  return url.includes("dpg-") || url.includes(".render.com") || url.includes("render.com");
+  // типичные признаки Render Postgres
+  return url.includes("dpg-") || url.includes("render.com");
 }
 
-function buildPoolConfig(dbUrl) {
-  const url = dbUrl || "";
-  const isRender = isRenderPostgresUrl(url);
-
-  // Для Render Postgres часто нужен ssl, но сертификат может быть self-signed.
-  // Поэтому rejectUnauthorized:false — чтобы не падало с DEPTH_ZERO_SELF_SIGNED_CERT.
-  const ssl = isRender ? { rejectUnauthorized: false } : { rejectUnauthorized: false };
-
-  return {
-    connectionString: withSslModeRequire(url),
-    ssl,
-    keepAlive: true,
-    connectionTimeoutMillis: 20000,
-    idleTimeoutMillis: 30000,
-    max: 5
-  };
+function withSslModeRequireOnlyForSupabase(url) {
+  // sslmode=require оставляем ТОЛЬКО для Supabase.
+  if (!url) return url;
+  if (!isSupabaseUrl(url)) return url;
+  if (url.includes("sslmode=")) return url;
+  return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
 }
 
-const pool = new Pool(buildPoolConfig(DATABASE_URL));
+/**
+ * КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ:
+ * Render Postgres иногда отдаёт self-signed цепочку,
+ * и pg/Node продолжает ругаться даже при ssl.rejectUnauthorized=false.
+ * Самый надёжный фикс — отключить проверку TLS на уровне Node (только для Render URL).
+ */
+if (isRenderPostgresUrl(DATABASE_URL)) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
+const pool = new Pool({
+  connectionString: withSslModeRequireOnlyForSupabase(DATABASE_URL),
+
+  // Для Supabase нужен SSL; для Render тоже может быть SSL,
+  // но проверку мы уже отключили через NODE_TLS_REJECT_UNAUTHORIZED=0 (для Render).
+  // Здесь ставим ssl=true, чтобы pg не пытался "угадывать".
+  ssl: true,
+
+  keepAlive: true,
+  connectionTimeoutMillis: 20000,
+  idleTimeoutMillis: 30000,
+  max: 5
+});
 
 async function q(text, params) {
   return await pool.query(text, params);
