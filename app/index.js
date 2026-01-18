@@ -20,51 +20,36 @@ app.use(express.static(publicDir));
 
 /**
  * ENV
- * DATABASE_URL           - текущая база (сейчас Render Postgres Internal URL)
- * SUPABASE_DATABASE_URL  - старая база Supabase (для переноса истории)
- * MIGRATE_KEY            - ключ для запуска миграции через /api/migrate?key=
- * BOT_TOKEN              - телеграм бот токен (опционально)
- * TG_CHAT_ID             - chat_id куда слать (опционально)
+ * DATABASE_URL  - строка подключения Postgres (Render / Supabase и т.п.)
+ * BOT_TOKEN     - телеграм бот токен (опционально)
+ * TG_CHAT_ID    - chat_id куда слать (опционально)
+ * MIGRATE_KEY   - ключ для защищённых миграций/импорта (опционально)
  */
 const DATABASE_URL = process.env.DATABASE_URL;
-const SUPABASE_DATABASE_URL = process.env.SUPABASE_DATABASE_URL;
-const MIGRATE_KEY = process.env.MIGRATE_KEY || "";
 
 // --- helpers ---
 function safeErr(e) {
+  // максимум инфы в логи/health
   return {
     message: e?.message || String(e),
     code: e?.code || null,
     detail: e?.detail || null,
     hint: e?.hint || null,
     where: e?.where || null,
-    stack: e?.stack ? String(e.stack).slice(0, 1800) : null
+    stack: e?.stack ? String(e.stack).slice(0, 1200) : null
   };
 }
 
 function withSslModeRequire(url) {
+  // иногда ожидают sslmode=require
   if (!url) return url;
   if (url.includes("sslmode=")) return url;
   return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
 }
 
-function shouldUseSslFor(url) {
-  // Для Supabase обычно нужен SSL.
-  // Для Render Postgres internal иногда SSL не нужен, но даже если включён —
-  // rejectUnauthorized:false убирает DEPTH_ZERO_SELF_SIGNED_CERT.
-  if (!url) return false;
-  const u = String(url);
-  if (u.includes("pooler.supabase.com")) return true;
-  if (u.includes("supabase.co")) return true;
-  // Render Postgres обычно: dpg-...
-  if (u.includes("@dpg-") || u.includes("dpg-")) return true;
-  return true;
-}
-
-// --- основной пул (текущая база = Render Postgres) ---
 const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: shouldUseSslFor(DATABASE_URL) ? { rejectUnauthorized: false } : false,
+  connectionString: withSslModeRequire(DATABASE_URL),
+  ssl: { rejectUnauthorized: false },
   keepAlive: true,
   connectionTimeoutMillis: 20000,
   idleTimeoutMillis: 30000,
@@ -136,7 +121,10 @@ async function initDb() {
       return;
     }
 
+    // 1) проверим, что коннект вообще живой
     await q("SELECT 1 as ok");
+
+    // 2) создадим таблицу при необходимости
     await ensureSchema();
 
     dbReady = true;
@@ -151,9 +139,76 @@ async function initDb() {
   }
 }
 
+// важное: не блокируем запуск сервера навсегда, но сразу пробуем поднять БД
 await initDb();
 
-// health
+/**
+ * Импорт SQL без установок на ПК:
+ * POST /api/import_sql?key=YOUR_MIGRATE_KEY
+ * body: { "sql": "INSERT ...; INSERT ...;" }
+ */
+function patchImportSql(raw) {
+  if (!raw) return "";
+
+  let s = String(raw);
+
+  // если ты случайно вставил markdown-таблицу с пайпами — чистим
+  s = s.replace(/^\s*\|\s*/gm, "");
+  s = s.replace(/\s*\|\s*$/gm, "");
+
+  // убираем одиночные строки типа "sql" / заголовки из экспорта
+  s = s.replace(/^\s*sql\s*$/gim, "");
+
+  // добавляем защиту от дублей по request_id
+  // INSERT INTO reports (...) VALUES (...);
+  // -> INSERT INTO reports (...) VALUES (...) ON CONFLICT (request_id) DO NOTHING;
+  s = s.replace(
+    /INSERT\s+INTO\s+reports\s*\(([\s\S]*?)\)\s*VALUES\s*\(([\s\S]*?)\)\s*;\s*/gim,
+    "INSERT INTO reports ($1) VALUES ($2) ON CONFLICT (request_id) DO NOTHING;\n"
+  );
+
+  return s.trim();
+}
+
+app.post("/api/import_sql", async (req, res) => {
+  try {
+    const key = String(req.query.key || "");
+    const MIGRATE_KEY = process.env.MIGRATE_KEY;
+
+    if (!MIGRATE_KEY || key !== MIGRATE_KEY) {
+      return res.status(403).json({ ok: false, error: "Forbidden (bad key)." });
+    }
+
+    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
+
+    const rawSql = req.body?.sql;
+    const sql = patchImportSql(rawSql);
+
+    if (!sql) {
+      return res.status(400).json({ ok: false, error: "Empty sql." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(sql);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    const cnt = (await q(`SELECT COUNT(*)::int AS cnt FROM reports`)).rows?.[0]?.cnt ?? null;
+    res.json({ ok: true, imported: true, cnt });
+  } catch (e) {
+    const info = safeErr(e);
+    res.status(500).json({ ok: false, error: info.message || "import failed", error_full: info });
+  }
+});
+
+// health (расширено)
 app.get("/api/health", async (req, res) => {
   try {
     if (!dbReady) {
@@ -383,7 +438,7 @@ app.get("/api/export.xlsx", async (req, res) => {
     ws.getColumn(6).numFmt = '#,##0" ₸"';
     ws.getColumn(7).numFmt = "0.00";
 
-    // wrap для комментариев и для всех строк (чтобы на айфоне тоже было нормально)
+    // wrap для комментариев и для всех строк
     ws.getColumn(10).alignment = { vertical: "top", horizontal: "left", wrapText: true };
     for (let r = 2; r <= ws.rowCount; r++) {
       const row = ws.getRow(r);
@@ -399,98 +454,6 @@ app.get("/api/export.xlsx", async (req, res) => {
     res.end();
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || "unknown" });
-  }
-});
-
-/**
- * ✅ МИГРАЦИЯ ИСТОРИИ (Supabase -> текущая БД Render)
- * Вызов один раз:
- *   /api/migrate?key=YOUR_MIGRATE_KEY
- */
-app.get("/api/migrate", async (req, res) => {
-  try {
-    // защита
-    const key = String(req.query.key || "");
-    if (!MIGRATE_KEY) {
-      return res.status(400).json({ ok: false, error: "MIGRATE_KEY is not set in Render Environment." });
-    }
-    if (key !== MIGRATE_KEY) {
-      return res.status(403).json({ ok: false, error: "Forbidden (bad key)." });
-    }
-
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-    if (!SUPABASE_DATABASE_URL) {
-      return res.status(400).json({ ok: false, error: "SUPABASE_DATABASE_URL is missing in Render Environment." });
-    }
-
-    // пул к Supabase
-    const supaPool = new Pool({
-      connectionString: withSslModeRequire(SUPABASE_DATABASE_URL),
-      ssl: { rejectUnauthorized: false },
-      keepAlive: true,
-      connectionTimeoutMillis: 20000,
-      idleTimeoutMillis: 30000,
-      max: 3
-    });
-
-    // читаем из supabase
-    const src = await supaPool.query(`SELECT * FROM reports ORDER BY created_at ASC`);
-    const rows = src.rows || [];
-
-    let migrated = 0;
-    let skipped = 0;
-
-    for (const r of rows) {
-      // если вдруг request_id пустой — делаем стабильный
-      const rid =
-        (r.request_id && String(r.request_id).trim()) ||
-        crypto
-          .createHash("md5")
-          .update(
-            [
-              r.manager || "",
-              r.restaurant || "",
-              r.reason || "",
-              r.start || "",
-              r.end || "",
-              String(r.amount || 0),
-              String(r.created_at || 0)
-            ].join("|")
-          )
-          .digest("hex");
-
-      const result = await q(
-        `
-        INSERT INTO reports (request_id, manager, restaurant, reason, comment, start, "end", amount, created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-        ON CONFLICT (request_id) DO NOTHING
-        `,
-        [
-          rid,
-          String(r.manager || "").trim(),
-          String(r.restaurant || "").trim(),
-          String(r.reason || "").trim(),
-          r.comment ? String(r.comment) : "",
-          r.start ? String(r.start) : "",
-          r.end ? String(r.end) : "",
-          Math.round(Number(r.amount) || 0),
-          Number(r.created_at) || Date.now()
-        ]
-      );
-
-      // pg: rowCount = 1 если вставили, 0 если конфликт
-      if (result.rowCount === 1) migrated++;
-      else skipped++;
-    }
-
-    try {
-      await supaPool.end();
-    } catch (_) {}
-
-    return res.json({ ok: true, total_source: rows.length, migrated, skipped });
-  } catch (e) {
-    const info = safeErr(e);
-    return res.status(500).json({ ok: false, error: info.message || "migrate failed", error_full: info });
   }
 });
 
