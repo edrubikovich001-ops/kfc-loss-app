@@ -22,7 +22,7 @@ app.use(express.static(publicDir));
 
 /**
  * ENV
- * DATABASE_URL  - строка подключения Supabase Postgres (pooled или direct)
+ * DATABASE_URL  - строка подключения Postgres (Render/Supabase)
  * BOT_TOKEN     - телеграм бот токен (опционально)
  * TG_CHAT_ID    - chat_id куда слать (опционально)
  */
@@ -30,44 +30,51 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 // --- helpers ---
 function safeErr(e) {
-  // максимум инфы в логи/health
   return {
     message: e?.message || String(e),
     code: e?.code || null,
     detail: e?.detail || null,
     hint: e?.hint || null,
     where: e?.where || null,
-    stack: e?.stack ? String(e.stack).slice(0, 1600) : null
+    stack: e?.stack ? String(e.stack).slice(0, 1400) : null
   };
 }
 
 function withSslModeRequire(url) {
-  // Supabase pooler/direct иногда ожидают sslmode=require.
+  // можно оставить — не мешает, но для Render Postgres не обязателен
   if (!url) return url;
   if (url.includes("sslmode=")) return url;
   return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+function isRenderPostgresUrl(url) {
+  if (!url) return false;
+  // типичные признаки Render Postgres internal/external
+  return url.includes("dpg-") || url.includes(".render.com") || url.includes("render.com");
 }
 
-const pool = new Pool({
-  connectionString: withSslModeRequire(DATABASE_URL),
-  ssl: { rejectUnauthorized: false },
-  keepAlive: true,
-  connectionTimeoutMillis: 20000,
-  idleTimeoutMillis: 30000,
-  max: 5
-});
+function buildPoolConfig(dbUrl) {
+  const url = dbUrl || "";
+  const isRender = isRenderPostgresUrl(url);
 
-pool.on("error", (err) => {
-  console.error("PG pool error:", safeErr(err));
-});
+  // Для Render Postgres часто нужен ssl, но сертификат может быть self-signed.
+  // Поэтому rejectUnauthorized:false — чтобы не падало с DEPTH_ZERO_SELF_SIGNED_CERT.
+  const ssl = isRender ? { rejectUnauthorized: false } : { rejectUnauthorized: false };
+
+  return {
+    connectionString: withSslModeRequire(url),
+    ssl,
+    keepAlive: true,
+    connectionTimeoutMillis: 20000,
+    idleTimeoutMillis: 30000,
+    max: 5
+  };
+}
+
+const pool = new Pool(buildPoolConfig(DATABASE_URL));
 
 async function q(text, params) {
-  const r = await pool.query(text, params);
-  return r;
+  return await pool.query(text, params);
 }
 
 function parseRuDT(s) {
@@ -122,13 +129,7 @@ let dbReady = false;
 let dbError = "";
 let dbErrorFull = null;
 
-let initInProgress = false;
-let schemaEnsured = false;
-
 async function initDb() {
-  if (initInProgress) return;
-  initInProgress = true;
-
   try {
     if (!DATABASE_URL) {
       dbReady = false;
@@ -137,60 +138,24 @@ async function initDb() {
       return;
     }
 
-    const attempts = 10;
-    for (let i = 1; i <= attempts; i++) {
-      try {
-        await q("SELECT 1 as ok");
-        dbReady = true;
-        dbError = "";
-        dbErrorFull = null;
+    await q("SELECT 1 as ok");
+    await ensureSchema();
 
-        if (!schemaEnsured) {
-          await ensureSchema();
-          schemaEnsured = true;
-        }
-
-        console.log("DB ready ✅");
-        return;
-      } catch (e) {
-        const info = safeErr(e);
-        dbReady = false;
-        dbError = info.message || "db init failed";
-        dbErrorFull = info;
-
-        console.error(`DB init attempt ${i}/${attempts} failed:`, info);
-
-        const msg = (info.message || "").toLowerCase();
-        if (
-          msg.includes("password authentication failed") ||
-          msg.includes("no pg_hba.conf entry") ||
-          (msg.includes("role") && msg.includes("does not exist")) ||
-          (msg.includes("database") && msg.includes("does not exist"))
-        ) {
-          return;
-        }
-
-        const waitMs = Math.min(15000, 1000 * Math.pow(2, i - 1));
-        await sleep(waitMs);
-      }
-    }
-  } finally {
-    initInProgress = false;
+    dbReady = true;
+    dbError = "";
+    dbErrorFull = null;
+  } catch (e) {
+    dbReady = false;
+    const info = safeErr(e);
+    dbError = info.message || "db init failed";
+    dbErrorFull = info;
+    console.error("DB init failed:", info);
   }
 }
 
-initDb();
+await initDb();
 
-async function ensureDbReady() {
-  if (dbReady) return;
-  await initDb();
-}
-
-/**
- * ✅ Диагностика сети без Render Shell.
- * Открой: /api/netcheck
- * Смотрим DNS и TCP до pooler host:port.
- */
+// netcheck (оставляем — полезно)
 app.get("/api/netcheck", async (req, res) => {
   const host = "aws-1-ap-south-1.pooler.supabase.com";
   const port = 5432;
@@ -225,10 +190,6 @@ app.get("/api/netcheck", async (req, res) => {
 app.get("/api/health", async (req, res) => {
   try {
     if (!dbReady) {
-      await initDb();
-    }
-
-    if (!dbReady) {
       return res.json({
         ok: false,
         dbReady: false,
@@ -237,7 +198,6 @@ app.get("/api/health", async (req, res) => {
         hasDatabaseUrl: !!DATABASE_URL
       });
     }
-
     await q("SELECT 1 as ok");
     res.json({ ok: true, dbReady: true, error: "" });
   } catch (e) {
@@ -249,9 +209,7 @@ app.get("/api/health", async (req, res) => {
 // list
 app.get("/api/reports", async (req, res) => {
   try {
-    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-
     const r = await q(`SELECT * FROM reports ORDER BY created_at DESC`);
     res.json({ ok: true, reports: r.rows });
   } catch (e) {
@@ -262,7 +220,6 @@ app.get("/api/reports", async (req, res) => {
 // create (с защитой от дубля по request_id)
 app.post("/api/reports", async (req, res) => {
   try {
-    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const { manager, restaurant, reason, amount, start, end, comment, request_id } = req.body || {};
@@ -332,7 +289,6 @@ app.post("/api/reports", async (req, res) => {
 // update
 app.put("/api/reports/:id", async (req, res) => {
   try {
-    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const id = Number(req.params.id);
@@ -379,7 +335,6 @@ app.put("/api/reports/:id", async (req, res) => {
 // delete
 app.delete("/api/reports/:id", async (req, res) => {
   try {
-    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const id = Number(req.params.id);
@@ -395,7 +350,6 @@ app.delete("/api/reports/:id", async (req, res) => {
 // export excel (серверный) — перенос в комментариях + длительность после суммы
 app.get("/api/export.xlsx", async (req, res) => {
   try {
-    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const rows = (await q(`SELECT * FROM reports`)).rows || [];
@@ -462,7 +416,6 @@ app.get("/api/export.xlsx", async (req, res) => {
     ws.getColumn(6).numFmt = '#,##0" ₸"';
     ws.getColumn(7).numFmt = "0.00";
 
-    // wrap для комментариев и для всех строк
     ws.getColumn(10).alignment = { vertical: "top", horizontal: "left", wrapText: true };
     for (let r = 2; r <= ws.rowCount; r++) {
       const row = ws.getRow(r);
