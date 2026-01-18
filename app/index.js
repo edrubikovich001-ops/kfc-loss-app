@@ -20,16 +20,16 @@ app.use(express.static(publicDir));
 
 /**
  * ENV
- * DATABASE_URL  - строка подключения Postgres (Render / Supabase и т.п.)
- * BOT_TOKEN     - телеграм бот токен (опционально)
- * TG_CHAT_ID    - chat_id куда слать (опционально)
- * MIGRATE_KEY   - ключ для защищённых миграций/импорта (опционально)
+ * DATABASE_URL
+ * BOT_TOKEN
+ * TG_CHAT_ID
+ * TG_THREAD_ID   <-- ВАЖНО
+ * MIGRATE_KEY
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 
 // --- helpers ---
 function safeErr(e) {
-  // максимум инфы в логи/health
   return {
     message: e?.message || String(e),
     code: e?.code || null,
@@ -41,7 +41,6 @@ function safeErr(e) {
 }
 
 function withSslModeRequire(url) {
-  // иногда ожидают sslmode=require
   if (!url) return url;
   if (url.includes("sslmode=")) return url;
   return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
@@ -60,37 +59,7 @@ async function q(text, params) {
   return await pool.query(text, params);
 }
 
-function parseRuDT(s) {
-  if (!s || typeof s !== "string") return null;
-  const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
-  if (!m) return null;
-  const dd = Number(m[1]),
-    mm = Number(m[2]) - 1,
-    yy = Number(m[3]),
-    hh = Number(m[4]),
-    mi = Number(m[5]);
-  const d = new Date(yy, mm, dd, hh, mi);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function hoursDiff(startStr, endStr) {
-  const a = parseRuDT(startStr);
-  const b = parseRuDT(endStr);
-  if (!a || !b) return "";
-  const diff = (b.getTime() - a.getTime()) / (1000 * 60 * 60);
-  return Math.round(diff * 100) / 100;
-}
-
-function splitRestaurant(r) {
-  const s = (r || "").trim();
-  if (s.includes(" — ")) {
-    const parts = s.split(" — ");
-    return { code: (parts[0] || "").trim(), name: parts.slice(1).join(" — ").trim() };
-  }
-  return { code: "", name: s };
-}
-
+// ---------------- DB INIT ----------------
 async function ensureSchema() {
   await q(`
     CREATE TABLE IF NOT EXISTS reports (
@@ -117,145 +86,40 @@ async function initDb() {
     if (!DATABASE_URL) {
       dbReady = false;
       dbError = "DATABASE_URL is missing";
-      dbErrorFull = { message: "DATABASE_URL is missing" };
       return;
     }
-
-    // 1) проверим, что коннект вообще живой
-    await q("SELECT 1 as ok");
-
-    // 2) создадим таблицу при необходимости
+    await q("SELECT 1");
     await ensureSchema();
-
     dbReady = true;
     dbError = "";
-    dbErrorFull = null;
   } catch (e) {
     dbReady = false;
     const info = safeErr(e);
-    dbError = info.message || "db init failed";
+    dbError = info.message;
     dbErrorFull = info;
     console.error("DB init failed:", info);
   }
 }
 
-// важное: не блокируем запуск сервера навсегда, но сразу пробуем поднять БД
 await initDb();
 
-/**
- * Импорт SQL без установок на ПК:
- * POST /api/import_sql?key=YOUR_MIGRATE_KEY
- * body: { "sql": "INSERT ...; INSERT ...;" }
- */
-function patchImportSql(raw) {
-  if (!raw) return "";
-
-  let s = String(raw);
-
-  // если ты случайно вставил markdown-таблицу с пайпами — чистим
-  s = s.replace(/^\s*\|\s*/gm, "");
-  s = s.replace(/\s*\|\s*$/gm, "");
-
-  // убираем одиночные строки типа "sql" / заголовки из экспорта
-  s = s.replace(/^\s*sql\s*$/gim, "");
-
-  // добавляем защиту от дублей по request_id
-  // INSERT INTO reports (...) VALUES (...);
-  // -> INSERT INTO reports (...) VALUES (...) ON CONFLICT (request_id) DO NOTHING;
-  s = s.replace(
-    /INSERT\s+INTO\s+reports\s*\(([\s\S]*?)\)\s*VALUES\s*\(([\s\S]*?)\)\s*;\s*/gim,
-    "INSERT INTO reports ($1) VALUES ($2) ON CONFLICT (request_id) DO NOTHING;\n"
-  );
-
-  return s.trim();
-}
-
-app.post("/api/import_sql", async (req, res) => {
-  try {
-    const key = String(req.query.key || "");
-    const MIGRATE_KEY = process.env.MIGRATE_KEY;
-
-    if (!MIGRATE_KEY || key !== MIGRATE_KEY) {
-      return res.status(403).json({ ok: false, error: "Forbidden (bad key)." });
-    }
-
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-
-    const rawSql = req.body?.sql;
-    const sql = patchImportSql(rawSql);
-
-    if (!sql) {
-      return res.status(400).json({ ok: false, error: "Empty sql." });
-    }
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query(sql);
-      await client.query("COMMIT");
-    } catch (e) {
-      await client.query("ROLLBACK").catch(() => {});
-      throw e;
-    } finally {
-      client.release();
-    }
-
-    const cnt = (await q(`SELECT COUNT(*)::int AS cnt FROM reports`)).rows?.[0]?.cnt ?? null;
-    res.json({ ok: true, imported: true, cnt });
-  } catch (e) {
-    const info = safeErr(e);
-    res.status(500).json({ ok: false, error: info.message || "import failed", error_full: info });
-  }
-});
-
-// health (расширено)
-app.get("/api/health", async (req, res) => {
-  try {
-    if (!dbReady) {
-      return res.json({
-        ok: false,
-        dbReady: false,
-        error: dbError || "db not ready",
-        error_full: dbErrorFull,
-        hasDatabaseUrl: !!DATABASE_URL
-      });
-    }
-    await q("SELECT 1 as ok");
-    res.json({ ok: true, dbReady: true, error: "" });
-  } catch (e) {
-    const info = safeErr(e);
-    res.status(500).json({ ok: false, dbReady: false, error: info.message || "db error", error_full: info });
-  }
-});
-
-// list
-app.get("/api/reports", async (req, res) => {
-  try {
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-    const r = await q(`SELECT * FROM reports ORDER BY created_at DESC`);
-    res.json({ ok: true, reports: r.rows });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "unknown" });
-  }
-});
-
-// create (с защитой от дубля по request_id)
+// ---------------- CREATE REPORT ----------------
 app.post("/api/reports", async (req, res) => {
   try {
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
+    if (!dbReady) return res.status(503).json({ ok: false, error: dbError });
 
     const { manager, restaurant, reason, amount, start, end, comment, request_id } = req.body || {};
-
     if (!manager || !restaurant || !reason) {
       return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
     }
+
     const nAmount = Number(amount);
     if (!Number.isFinite(nAmount) || nAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
     }
 
     const created_at = Date.now();
-    const rid = (request_id && String(request_id).trim()) || crypto.randomUUID();
+    const rid = request_id || crypto.randomUUID();
 
     await q(
       `
@@ -265,12 +129,12 @@ app.post("/api/reports", async (req, res) => {
       `,
       [
         rid,
-        String(manager).trim(),
-        String(restaurant).trim(),
-        String(reason).trim(),
-        comment ? String(comment) : "",
-        start ? String(start) : "",
-        end ? String(end) : "",
+        manager,
+        restaurant,
+        reason,
+        comment || "",
+        start || "",
+        end || "",
         Math.round(nAmount),
         created_at
       ]
@@ -278,9 +142,11 @@ app.post("/api/reports", async (req, res) => {
 
     const row = (await q(`SELECT * FROM reports WHERE request_id=$1`, [rid])).rows[0];
 
-    // Telegram (опционально)
+    // ---------------- TELEGRAM ----------------
     const BOT_TOKEN = process.env.BOT_TOKEN;
     const TG_CHAT_ID = process.env.TG_CHAT_ID;
+    const TG_THREAD_ID = process.env.TG_THREAD_ID;
+
     if (BOT_TOKEN && TG_CHAT_ID && row) {
       const text =
         `🚨 ОТЧЕТ ПО ПОТЕРЯМ\n\n` +
@@ -293,13 +159,24 @@ app.post("/api/reports", async (req, res) => {
         `💬 Комментарий: ${row.comment || "-"}`;
 
       try {
-        const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const payload = {
+          chat_id: TG_CHAT_ID,
+          text
+        };
+
+        // 🔥 ВАЖНО: отправка В КОНКРЕТНУЮ ТЕМУ
+        if (TG_THREAD_ID && String(TG_THREAD_ID).trim()) {
+          payload.message_thread_id = Number(TG_THREAD_ID);
+        }
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: TG_CHAT_ID, text })
+          body: JSON.stringify(payload)
         });
-        await tgResp.json().catch(() => ({}));
-      } catch (_) {}
+      } catch (e) {
+        console.error("Telegram error:", e);
+      }
     }
 
     res.json({ ok: true, report: row });
@@ -308,156 +185,7 @@ app.post("/api/reports", async (req, res) => {
   }
 });
 
-// update
-app.put("/api/reports/:id", async (req, res) => {
-  try {
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "Bad id." });
-
-    const existing = (await q(`SELECT * FROM reports WHERE id=$1`, [id])).rows[0];
-    if (!existing) return res.status(404).json({ ok: false, error: "Not found." });
-
-    const { manager, restaurant, reason, amount, start, end, comment } = req.body || {};
-
-    if (!manager || !restaurant || !reason) {
-      return res.status(400).json({ ok: false, error: "Заполни менеджера, ресторан и причину." });
-    }
-    const nAmount = Number(amount);
-    if (!Number.isFinite(nAmount) || nAmount <= 0) {
-      return res.status(400).json({ ok: false, error: "Укажи сумму больше нуля." });
-    }
-
-    const r = await q(
-      `
-      UPDATE reports
-      SET manager=$1, restaurant=$2, reason=$3, amount=$4, start=$5, "end"=$6, comment=$7
-      WHERE id=$8
-      RETURNING *
-      `,
-      [
-        String(manager).trim(),
-        String(restaurant).trim(),
-        String(reason).trim(),
-        Math.round(nAmount),
-        start ? String(start) : "",
-        end ? String(end) : "",
-        comment ? String(comment) : "",
-        id
-      ]
-    );
-
-    res.json({ ok: true, report: r.rows[0] });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "unknown" });
-  }
-});
-
-// delete
-app.delete("/api/reports/:id", async (req, res) => {
-  try {
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: "Bad id." });
-
-    await q(`DELETE FROM reports WHERE id=$1`, [id]);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "unknown" });
-  }
-});
-
-// export excel (серверный) — перенос в комментариях + длительность после суммы
-app.get("/api/export.xlsx", async (req, res) => {
-  try {
-    if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
-
-    const rows = (await q(`SELECT * FROM reports`)).rows || [];
-    rows.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
-
-    const wb = new ExcelJS.Workbook();
-    wb.creator = "KFC Loss Control";
-    wb.created = new Date();
-
-    const ws = wb.addWorksheet("Reports", {
-      views: [{ state: "frozen", ySplit: 1 }]
-    });
-
-    const header = [
-      "ID",
-      "Менеджер",
-      "Ресторан код",
-      "Ресторан",
-      "Причина",
-      "Сумма",
-      "Длительность (ч)",
-      "Начало",
-      "Конец",
-      "Комментарий"
-    ];
-    ws.addRow(header);
-
-    for (const r of rows) {
-      const rr = splitRestaurant(r.restaurant);
-      ws.addRow([
-        Number(r.id) || "",
-        r.manager || "",
-        rr.code || "",
-        rr.name || "",
-        r.reason || "",
-        Number(r.amount) || 0,
-        hoursDiff(r.start, r.end),
-        r.start || "",
-        r.end || "",
-        r.comment || ""
-      ]);
-    }
-
-    ws.columns = [
-      { width: 10 },
-      { width: 22 },
-      { width: 14 },
-      { width: 28 },
-      { width: 18 },
-      { width: 14 },
-      { width: 16 },
-      { width: 18 },
-      { width: 18 },
-      { width: 34 }
-    ];
-
-    ws.autoFilter = { from: "A1", to: "J1" };
-
-    const headerRow = ws.getRow(1);
-    headerRow.font = { bold: true };
-    headerRow.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    headerRow.height = 20;
-
-    ws.getColumn(6).numFmt = '#,##0" ₸"';
-    ws.getColumn(7).numFmt = "0.00";
-
-    // wrap для комментариев и для всех строк
-    ws.getColumn(10).alignment = { vertical: "top", horizontal: "left", wrapText: true };
-    for (let r = 2; r <= ws.rowCount; r++) {
-      const row = ws.getRow(r);
-      row.alignment = { vertical: "top", horizontal: "left", wrapText: true };
-      row.height = 30;
-    }
-
-    const filename = `KFC_Loss_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-    await wb.xlsx.write(res);
-    res.end();
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || "unknown" });
-  }
-});
-
-// Telegram WebApp может приходить с любыми путями — отдаём index.html
+// ---------------- SERVER ----------------
 app.get(/^\/(?!api).*/, (req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
