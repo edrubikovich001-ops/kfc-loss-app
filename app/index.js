@@ -35,7 +35,7 @@ function safeErr(e) {
     detail: e?.detail || null,
     hint: e?.hint || null,
     where: e?.where || null,
-    stack: e?.stack ? String(e.stack).slice(0, 1200) : null
+    stack: e?.stack ? String(e.stack).slice(0, 1600) : null
   };
 }
 
@@ -46,18 +46,28 @@ function withSslModeRequire(url) {
   return url.includes("?") ? `${url}&sslmode=require` : `${url}?sslmode=require`;
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ---------------- DB: только стабилизация старта/ретраи ----------------
 const pool = new Pool({
   connectionString: withSslModeRequire(DATABASE_URL),
   ssl: { rejectUnauthorized: false },
-  // делаем стабильнее на Render
   keepAlive: true,
-  connectionTimeoutMillis: 12000,
+  // делаем стабильнее на Render + Supabase pooler
+  connectionTimeoutMillis: 20000,
   idleTimeoutMillis: 30000,
   max: 5
 });
 
+pool.on("error", (err) => {
+  console.error("PG pool error:", safeErr(err));
+});
+
 async function q(text, params) {
-  return await pool.query(text, params);
+  const r = await pool.query(text, params);
+  return r;
 }
 
 function parseRuDT(s) {
@@ -112,7 +122,15 @@ let dbReady = false;
 let dbError = "";
 let dbErrorFull = null;
 
+// 🔥 ВАЖНО: не блокируем старт приложения.
+// Вместо "await initDb()" делаем фоновые ретраи.
+let initInProgress = false;
+let schemaEnsured = false;
+
 async function initDb() {
+  if (initInProgress) return;
+  initInProgress = true;
+
   try {
     if (!DATABASE_URL) {
       dbReady = false;
@@ -121,30 +139,68 @@ async function initDb() {
       return;
     }
 
-    // 1) проверим, что коннект вообще живой
-    await q("SELECT 1 as ok");
+    // Несколько попыток поднять соединение (Supabase/Pooler может просыпаться)
+    const attempts = 10;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        await q("SELECT 1 as ok");
+        dbReady = true;
+        dbError = "";
+        dbErrorFull = null;
 
-    // 2) создадим таблицу при необходимости
-    await ensureSchema();
+        if (!schemaEnsured) {
+          await ensureSchema();
+          schemaEnsured = true;
+        }
 
-    dbReady = true;
-    dbError = "";
-    dbErrorFull = null;
-  } catch (e) {
-    dbReady = false;
-    const info = safeErr(e);
-    dbError = info.message || "db init failed";
-    dbErrorFull = info;
-    console.error("DB init failed:", info);
+        console.log("DB ready ✅");
+        return;
+      } catch (e) {
+        const info = safeErr(e);
+        dbReady = false;
+        dbError = info.message || "db init failed";
+        dbErrorFull = info;
+
+        console.error(`DB init attempt ${i}/${attempts} failed:`, info);
+
+        // Если это не сеть, а “не тот пароль/роль/БД” — дальше ретраи бессмысленны.
+        const msg = (info.message || "").toLowerCase();
+        if (
+          msg.includes("password authentication failed") ||
+          msg.includes("no pg_hba.conf entry") ||
+          (msg.includes("role") && msg.includes("does not exist")) ||
+          (msg.includes("database") && msg.includes("does not exist"))
+        ) {
+          return;
+        }
+
+        // backoff: 1s,2s,4s,8s... максимум 15s
+        const waitMs = Math.min(15000, 1000 * Math.pow(2, i - 1));
+        await sleep(waitMs);
+      }
+    }
+  } finally {
+    initInProgress = false;
   }
 }
 
-// важное: не блокируем запуск сервера навсегда, но сразу пробуем поднять БД
-await initDb();
+// запускаем ретраи сразу, но НЕ ждём (не блокируем сервер)
+initDb();
+
+// helper: перед любым запросом к БД попробуем поднять БД, если она ещё не готова
+async function ensureDbReady() {
+  if (dbReady) return;
+  await initDb();
+}
 
 // health (расширено)
 app.get("/api/health", async (req, res) => {
   try {
+    if (!dbReady) {
+      // пробуем поднять БД прямо на health
+      await initDb();
+    }
+
     if (!dbReady) {
       return res.json({
         ok: false,
@@ -154,6 +210,7 @@ app.get("/api/health", async (req, res) => {
         hasDatabaseUrl: !!DATABASE_URL
       });
     }
+
     await q("SELECT 1 as ok");
     res.json({ ok: true, dbReady: true, error: "" });
   } catch (e) {
@@ -165,7 +222,9 @@ app.get("/api/health", async (req, res) => {
 // list
 app.get("/api/reports", async (req, res) => {
   try {
+    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
+
     const r = await q(`SELECT * FROM reports ORDER BY created_at DESC`);
     res.json({ ok: true, reports: r.rows });
   } catch (e) {
@@ -176,6 +235,7 @@ app.get("/api/reports", async (req, res) => {
 // create (с защитой от дубля по request_id)
 app.post("/api/reports", async (req, res) => {
   try {
+    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const { manager, restaurant, reason, amount, start, end, comment, request_id } = req.body || {};
@@ -245,6 +305,7 @@ app.post("/api/reports", async (req, res) => {
 // update
 app.put("/api/reports/:id", async (req, res) => {
   try {
+    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const id = Number(req.params.id);
@@ -291,6 +352,7 @@ app.put("/api/reports/:id", async (req, res) => {
 // delete
 app.delete("/api/reports/:id", async (req, res) => {
   try {
+    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const id = Number(req.params.id);
@@ -306,6 +368,7 @@ app.delete("/api/reports/:id", async (req, res) => {
 // export excel (серверный) — перенос в комментариях + длительность после суммы
 app.get("/api/export.xlsx", async (req, res) => {
   try {
+    await ensureDbReady();
     if (!dbReady) return res.status(503).json({ ok: false, error: dbError || "db not ready" });
 
     const rows = (await q(`SELECT * FROM reports`)).rows || [];
