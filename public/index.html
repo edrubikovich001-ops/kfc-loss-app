@@ -702,18 +702,139 @@
   const monthNamesGenitive = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 
   const dataTU = {
-    "Alyona Rainskaya": ["12741 — KFC Baizar Mall","12714 — KFC Essentai Mall","12750 — KFC Alem Plaza","12757 — KFC Neftek","12768 — KFC KazGu Almaty","12806 — KFC NASIKHA ATYRAU","12815 — KFC INFINITY MALL ATYRAU"],
-    "Andrey Nacharov": ["12736 — KFC Batyr Mall","12737 — KFC Sarayarka","12751 — KFC UST Kamenogorsk","12772 — KFC Kutuzova Pavlodar","12783 — KFC MAXI MALL EKIBASTUZ","12784 — KFC MAXI MALL OSKEMEN","12787 — KFC Koschi","12825 — KFC CENTRAL PARK SEMEY"],
-    "Artyom Denissenko": ["12708 — KFC Khan Shatour","12720 — KFC Respblika","12724 — KFC Mechta","12733 — KFC Asia Park","12796 — KFC Magnum Edil","12803 — KFC VSTRECHA","12821 — KFC ZHYBEK ZHOLY COMPASS","12827 — KFC KOKSHETAU AUEZOVA","12830 — KFC NURLY ZHOL ASTANA"],
-    "Igor Sokharev": ["12710 — KFC Keruen","12726 — KFC Oasis","12782 — KFC NOMAD NEW","12786 — KFC Mart, Kostanay city","12809 — KFC DOSTYK MALL PETROPAVLOVSK","12826 — KFC KOSTANAY PLAZA"],
-    "Irina Zelenkevich": ["12716 — KFC Merey","12740 — KFC Aktau","12754 — KFC AK KALA MALL","12763 — KFC Shum Mall - Aktau","12778 — KFC Atameken","12780 — KFC Mart Taraz","12791 — KFC Kyzylorda","12829 — KFC ZHAISAN"],
-    "Lolokhon Makhmudova": ["12712 — KFC Googla","12722 — KFC Dostik Plaza","12743 — KFC Baluan Sholak","12746 — KFC Forum Mall","12779 — KFC Mart Almaty","12795 — KFC Globus","12811 — KFC APORT KULDZHA","12813 — KFC RP DOSTYK","12842 — KFC YASSY APARTMENTS TURKESTAN"],
-    "Nikol Tyurina": ["12810 — KFC Temirtau","12710 — KFC Keruen city Astana","12715 — KFC City Mall Karaganda","12723 — KFC Bogembay","12728 — KFC Green","12731 — KFC Flag Karaganda","12755 — KFC LITE ASTRAHANKA","12814 — KFC SYGANAK","12818 — KFC FOODCITY ASTANA"],
-    "Nurlan Ataibekov": ["12703 — KFC Mega Almaty","12704 — KFC Domillion","12713 — KFC Aport","12732 — KFC Adem","12761 — KFC Kulager","12770 — KFC Ainabulak","12790 — KFC Kaskelen","12808 — KFC COMPASS BISHKEK HIGHWAY","12816 — KFC APORT MIAMI"],
-    "Tolkinbek Zulpykhar": ["12820 — KFC Dalida Mall Aktobe","12706 — KFC Manasa","12738 — KFC GOLDEN KEY","12745 — KFC Mega Expo","12747 — KFC Central Stadium - Akotobe","12753 — KFC Keruen City Mall - Aktobe","12828 — KFC INCITY ASTANA"],
-    "Ulan Toiganbayev": ["12709 — KFC Maxima","12711 — KFC ADK","12725 — KFC Mega Park","12729 — KFC Tole Bi","12730 — KFC Moscow Mall","12756 — KFC SILKWAY CITY","12773 — KFC TSUM","12798 — KFC Compass","12804 — KFC GRES"],
-    "Valeriya Toishiyeva": ["12839 — KFC Shymkent Tashkent RP","12748 — KFC Shymkent Plaza","12758 — KFC VAZ","12760 — KFC LEMON","12777 — KFC Sever - Shymkent City","12824 — KFC MEGA MALL SHYMKENT","12832 — KFC ALMATY AIRPORT","12839 — KFC SHYMKENT TASHKENT RP","12841 — KFC DALA MALL SHYMKENT"],
-    "Zhaidary Talapova": ["12734 — KFC ATAKENT","12774 — KFC Asia Park Almaty","12775 — KFC MAGNUM - RELOCATION","12776 — KFC Malika","12799 — KFC Saryarka Almaty","12800 — KFC Masato","12801 — KFC Aksai","12807 — KFC SPUTNIK MALL","12819 — KFC GRAND PARK ALMATY"]
+    "Nikol Tyurina": [
+      "12702 — KFC Mega Astana",
+      "12715 — KFC City Mall Karaganda",
+      "12723 — KFC Bogembay",
+      "12728 — KFC Green",
+      "12731 — KFC Flag Karaganda",
+      "12755 — KFC LITE ASTRAHANKA",
+      "12810 — KFC TEMIRTAU",
+      "12814 — KFC SYGANAK",
+      "12818 — KFC FOODCITY ASTANA"
+    ],
+
+    "Nurlan Ataibekov": [
+      "12703 — KFC MEGA ALMATY",
+      "12704 — KFC DOMILLION",
+      "12713 — KFC APORT",
+      "12732 — KFC ADEM",
+      "12761 — KFC KULAGER",
+      "12770 — KFC AINABULAK",
+      "12790 — KFC KASKELEN",
+      "12808 — KFC COMPASS BISHKEK H",
+      "12816 — KFC APORT MIAMI"
+    ],
+
+    "Lolokhon Makhmudova": [
+      "12712 — KFC GOOGLA",
+      "12722 — KFC DOSTIK PLAZA",
+      "12743 — KFC BALUAN SHOLAK",
+      "12746 — KFC FORUM MALL",
+      "12779 — KFC MART",
+      "12795 — KFC GLOBUS",
+      "12811 — KFC APORT KULDZHA",
+      "12813 — KFC RP DOSTYK",
+      "12842 — KFC YASSY APARTMENTS T"
+    ],
+
+    "Ulan Toiganbayev": [
+      "12709 — KFC MAXIMA",
+      "12711 — KFC ADK",
+      "12725 — KFC MEGA PARK",
+      "12729 — KFC TOLE BI",
+      "12730 — KFC MOSCOW MALL",
+      "12756 — KFC SILKWAY CITY",
+      "12773 — KFC TSUM",
+      "12798 — KFC COMPASS",
+      "12804 — KFC GRES"
+    ],
+
+    "Igor Sokharev": [
+      "12710 — KFC Keruen",
+      "12726 — KFC Oasis",
+      "12745 — KFC Mega Expo",
+      "12782 — KFC NOMAD NEW",
+      "12786 — KFC Mart, Kostanay city",
+      "12809 — KFC DOSTYK MALL PETROPAVLOVSK",
+      "12826 — KFC KOSTANAY PLAZA"
+    ],
+
+    "Zhaidary Talapova": [
+      "12734 — KFC ATAKENT",
+      "12774 — KFC ASIA PARK ALMATY",
+      "12775 — KFC MAGNUM - RELOCATION",
+      "12776 — KFC MALIKA",
+      "12799 — KFC SARYARKA ALMATY",
+      "12800 — KFC MASATO",
+      "12801 — KFC AKSAI",
+      "12807 — KFC SPUTNIK MALL",
+      "12819 — KFC GRAND PARK ALMATY"
+    ],
+
+    "Irina Zelenkevich": [
+      "12716 — KFC MEREY",
+      "12740 — KFC AKTAU",
+      "12754 — KFC AK KALA MALL",
+      "12763 — KFC SHUM MALL - AKTAU",
+      "12778 — KFC ATAMEKEN",
+      "12780 — KFC TARAZ",
+      "12791 — KFC KYZYLORDA",
+      "12829 — KFC ZHAISAN"
+    ],
+
+    "Artyom Denissenko": [
+      "12708 — KFC Khan Shatour",
+      "12720 — KFC Respblika",
+      "12724 — KFC Mechta",
+      "12733 — KFC Asia Park",
+      "12796 — KFC Magnum Edil",
+      "12803 — KFC VSTRECHA",
+      "12821 — KFC ZHYBEK ZHOLY COMPASS",
+      "12827 — KFC KOKSHETAU AUEZOVA",
+      "12830 — KFC NURLY ZHOL ASTANA"
+    ],
+
+    "Valeriya Toishiyeva": [
+      "12748 — KFC SHYMKENT PLAZA",
+      "12758 — KFC VAZ",
+      "12760 — KFC LEMON",
+      "12777 — KFC SEVER - SHYMKENT CITY",
+      "12824 — KFC MEGA MALL SHYMKENT",
+      "12832 — KFC ALMATY AIRPORT",
+      "12839 — KFC SHYMKENT TASKENT RP",
+      "12841 — KFC DALA MALL SHYMKENT",
+      "12843 — KFC SHYMKENT CITY MALL"
+    ],
+
+    "Andrey Nacharov": [
+      "12736 — KFC Batyr Mall",
+      "12737 — KFC Sarayarka",
+      "12751 — KFC UST Kamenogorsk",
+      "12772 — KFC Kutuzova Pavlodar",
+      "12783 — KFC MAXI MALL EKIBASTUZ",
+      "12784 — KFC MAXI MALL OSKEMEN",
+      "12787 — KFC Koschi",
+      "12825 — KFC CENTRAL PARK SEMEY"
+    ],
+
+    "Alyona Rainskaya": [
+      "12714 — KFC ESSENTAI MALL",
+      "12741 — KFC ATRAU",
+      "12750 — KFC ALEM PLAZA",
+      "12757 — KFC NEFTEK",
+      "12768 — KFC KAZGU ALMATY",
+      "12806 — KFC NASIKHA ATYRAU",
+      "12815 — KFC INFINITY MALL ATYRAU"
+    ],
+
+    "Tolkhynbek Zulpykhar": [
+      "12706 — KFC Manasa",
+      "12738 — KFC GOLDEN KEY",
+      "12747 — KFC Central Stadium",
+      "12753 — KFC Keruen City Aktobe Mall",
+      "12828 — KFC INCITY ASTANA"
+    ]
   };
 
   const STORAGE_KEY = 'kfc_loss_pro_v12';
